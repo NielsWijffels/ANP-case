@@ -1,0 +1,18 @@
+# Temp & output files
+temp/
+output/
+__pycache__/
+*.pyc
+
+# Environment
+.env
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+*.log
