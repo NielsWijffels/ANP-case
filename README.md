@@ -4,9 +4,7 @@ Gemeenteraad video → Transcriptie → Sprekerherkenning → Nieuwsdetectie →
 
 ## 🚀 Snel starten (1 klik)
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/YOUR_USERNAME/ranst-poc/blob/main/RANST_Colab_Streaming.ipynb)
-
-> **Vervang `YOUR_USERNAME` hierboven met je GitHub username na het aanmaken van de repo.**
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NielsWijffels/ANP-case/blob/main/RANST_Colab_Streaming.ipynb)
 
 ### Hoe te gebruiken:
 1. Klik op de **"Open in Colab"** badge hierboven
