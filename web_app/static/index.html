@@ -157,24 +157,32 @@ a { color: var(--primary-light); text-decoration:none; }
 
 /* ── Preferences ── */
 .topic-grid {
-  display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr));
+  display:grid; grid-template-columns:1fr;
   gap:12px;
 }
-.topic-chip {
-  display:flex; align-items:center; gap:10px; padding:12px 16px;
-  border:2px solid var(--border); border-radius:8px; cursor:pointer;
-  transition:.2s; user-select:none;
+.topic-row {
+  display:flex; align-items:center; gap:12px; padding:14px 16px;
+  border:2px solid var(--border); border-radius:8px; transition:.2s;
 }
-.topic-chip:hover { border-color:var(--primary-light); }
-.topic-chip.selected { border-color:var(--primary); background:rgba(26,54,93,.06); }
-.topic-chip input { display:none; }
-.topic-chip .check {
-  width:20px; height:20px; border-radius:6px; border:2px solid var(--border);
-  display:flex; align-items:center; justify-content:center; transition:.2s;
+.topic-row .topic-name {
+  flex:1; font-weight:600; font-size:14px; min-width:200px;
 }
-.topic-chip.selected .check {
-  background:var(--primary); border-color:var(--primary); color:#fff;
+.level-selector {
+  display:flex; gap:0; border-radius:6px; overflow:hidden;
+  border:1px solid var(--border);
 }
+.level-btn {
+  padding:6px 14px; font-size:12px; font-weight:600;
+  cursor:pointer; transition:.2s; border:none; background:none;
+  color:var(--text-light); white-space:nowrap;
+}
+.level-btn:not(:last-child) { border-right:1px solid var(--border); }
+.level-btn:hover { background:var(--bg); }
+.level-btn.active-geen { background:#e2e8f0; color:var(--text); }
+.level-btn.active-bestuurlijk { background:var(--primary); color:#fff; }
+.level-btn.active-pers { background:var(--accent); color:#fff; }
+.badge-bestuurlijk { background:rgba(26,54,93,.1); color:var(--primary); }
+.badge-pers { background:rgba(230,126,34,.1); color:var(--accent); }
 
 .gemeente-search {
   position:relative; margin-bottom:16px;
@@ -400,9 +408,16 @@ a { color: var(--primary-light); text-decoration:none; }
             <h2 id="transcript-title">Transcript</h2>
             <div id="transcript-subtitle" style="color:var(--text-light);font-size:13px;"></div>
           </div>
-          <a id="transcript-stream-link" href="#" target="_blank" class="btn btn-accent btn-sm hidden">
-            Bekijk livestream
-          </a>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <a id="transcript-stream-link" href="#" target="_blank" class="btn btn-accent btn-sm hidden">
+              Bekijk livestream
+            </a>
+          </div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <input type="text" id="transcript-search" placeholder="Doorzoek transcript..." 
+                 style="width:100%;padding:8px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;"
+                 oninput="searchTranscript()">
         </div>
         <div id="transcript-chunks" class="transcript-chunks">
           <p style="color:var(--text-light)">Start een demo-vergadering om een transcript te zien.</p>
@@ -415,10 +430,15 @@ a { color: var(--primary-light); text-decoration:none; }
       <h2 style="margin-bottom:24px;">Voorkeuren</h2>
 
       <div class="card">
-        <h3>Onderwerpen</h3>
-        <p style="color:var(--text-light);font-size:13px;margin-bottom:16px;">
-          Selecteer de onderwerpen waarover u meldingen wilt ontvangen.
+        <h3>Onderwerpen & Interesse-niveau</h3>
+        <p style="color:var(--text-light);font-size:13px;margin-bottom:8px;">
+          Kies per onderwerp uw interesse-niveau:
         </p>
+        <div style="display:flex;gap:16px;margin-bottom:16px;font-size:12px;color:var(--text-light);">
+          <span><strong>Geen</strong> — geen meldingen</span>
+          <span><strong style="color:var(--primary)">Bestuurlijk</strong> — actionable inzichten voor PS</span>
+          <span><strong style="color:var(--accent)">Nieuwsredactie</strong> — beknopt nieuwsbericht</span>
+        </div>
         <div class="topic-grid" id="topics-grid"></div>
       </div>
 
@@ -449,8 +469,9 @@ a { color: var(--primary-light); text-decoration:none; }
 // ── State ──
 let token = localStorage.getItem('ranst_token');
 let user = null;
-let prefs = { topics: [], gemeenten: [] };
+let prefs = { topics: {}, gemeenten: [] };
 let allTopics = {};
+let interestLevels = {};
 let allGemeenten = [];
 let currentMeetingId = null;
 let transcriptPollInterval = null;
@@ -556,9 +577,17 @@ async function enterApp() {
   document.getElementById('user-name').textContent = user.name || user.email;
   document.getElementById('user-email').textContent = user.email;
 
-  allTopics = await api('/api/topics');
+  const topicsData = await api('/api/topics');
+  allTopics = topicsData.topics || topicsData;
+  interestLevels = topicsData.interest_levels || {};
   allGemeenten = await api('/api/gemeenten');
   prefs = await api('/api/preferences');
+  // Ensure topics is a dict
+  if (Array.isArray(prefs.topics)) {
+    const obj = {};
+    prefs.topics.forEach(t => obj[t] = 'bestuurlijk');
+    prefs.topics = obj;
+  }
 
   renderTopics();
   renderGemeentenTags();
@@ -659,15 +688,28 @@ async function loadAlerts() {
 
 function renderAlert(a) {
   const isUnread = !a.read;
-  const isNews = a.type === 'anp';
-  const topicLabel = allTopics[a.topic] || a.topic || 'Nieuws';
+  const isPers = a.level === 'pers';
+  const topicLabel = allTopics[a.topic] || a.topic || 'Melding';
+  const levelLabel = isPers ? '📰 Nieuwsredactie' : '🏛️ Bestuurlijk';
+  const levelBadge = isPers ? 'badge-pers' : 'badge-bestuurlijk';
   return `
     <div class="alert-item ${isUnread ? 'unread' : ''}" onclick="clickAlert(${a.id}, ${a.meeting_id})">
       <div style="flex:1">
-        <div class="alert-badge">${isNews ? '📰 ANP' : '🏛️ ' + topicLabel}</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
+          <span class="badge ${levelBadge}">${levelLabel}</span>
+          <span style="font-size:12px;color:var(--text-light)">${topicLabel}</span>
+        </div>
         <div class="alert-title">${escHtml(a.title || '')}</div>
         <div class="alert-summary">${escHtml(a.summary || '')}</div>
-        <div class="alert-time">${a.created_at || ''}</div>
+        <div style="display:flex;gap:12px;align-items:center;margin-top:8px;">
+          <span class="alert-time">${a.created_at || ''}</span>
+          ${a.meeting_id ? `<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openTranscript(${a.meeting_id}, '${escHtml(a.gemeente || '')}', '${escHtml(a.livestream_url || '')}')">
+            📝 Transcript
+          </button>` : ''}
+          ${a.livestream_url ? `<a class="btn btn-outline btn-sm" href="${escHtml(a.livestream_url)}" target="_blank" onclick="event.stopPropagation()">
+            📺 Livestream
+          </a>` : ''}
+        </div>
       </div>
     </div>
   `;
@@ -728,23 +770,32 @@ function formatTime(seconds) {
 // ── Preferences ──
 function renderTopics() {
   const grid = document.getElementById('topics-grid');
+  const levels = ['geen', 'bestuurlijk', 'pers'];
+  const labels = { geen: 'Geen', bestuurlijk: 'Bestuurlijk', pers: 'Nieuwsredactie' };
   grid.innerHTML = Object.entries(allTopics).map(([id, name]) => {
-    const sel = prefs.topics.includes(id) ? 'selected' : '';
+    const current = prefs.topics[id] || 'geen';
     return `
-      <label class="topic-chip ${sel}" onclick="toggleTopic(this, '${id}')">
-        <div class="check">${sel ? '✓' : ''}</div>
-        <span>${name}</span>
-      </label>
+      <div class="topic-row">
+        <div class="topic-name">${name}</div>
+        <div class="level-selector">
+          ${levels.map(lvl =>
+            `<button class="level-btn ${current === lvl ? 'active-' + lvl : ''}" 
+                     onclick="setTopicLevel('${id}', '${lvl}', this)">${labels[lvl]}</button>`
+          ).join('')}
+        </div>
+      </div>
     `;
   }).join('');
 }
 
-function toggleTopic(el, topicId) {
-  const idx = prefs.topics.indexOf(topicId);
-  if (idx >= 0) prefs.topics.splice(idx, 1);
-  else prefs.topics.push(topicId);
-  el.classList.toggle('selected');
-  el.querySelector('.check').textContent = el.classList.contains('selected') ? '✓' : '';
+function setTopicLevel(topicId, level, btn) {
+  prefs.topics[topicId] = level;
+  // Update button styling
+  const row = btn.closest('.level-selector');
+  row.querySelectorAll('.level-btn').forEach(b => {
+    b.className = 'level-btn';
+  });
+  btn.classList.add('active-' + level);
 }
 
 function renderGemeentenTags() {
@@ -824,7 +875,14 @@ function connectSSE() {
     try {
       const data = JSON.parse(e.data);
       if (data.type_event === 'alert') {
-        showToast(data.title || 'Melding', data.summary || data.quote || '', data.type === 'anp' ? 'news' : 'sector');
+        const isPers = data.level === 'pers';
+        showToast(
+          data.title || 'Melding',
+          data.summary || data.quote || '',
+          isPers ? 'news' : 'sector',
+          data.meeting_id,
+          data.livestream_url
+        );
         loadAlerts();
         loadDashboard();
       }
@@ -853,26 +911,56 @@ function connectSSE() {
 }
 
 // ── Toast ──
-function showToast(title, text, type) {
+function showToast(title, text, type, meetingId, livestreamUrl) {
   const container = document.getElementById('toast-container');
   const toast = document.createElement('div');
   toast.className = 'toast' + (type === 'news' ? ' news' : '');
+  const badge = type === 'news' ? '📰 Nieuwsredactie' : '🏛️ Bestuurlijk';
+  let buttons = '';
+  if (meetingId) {
+    buttons += `<button class="btn btn-outline btn-sm" style="margin-top:8px;margin-right:6px;" 
+      onclick="event.stopPropagation();openTranscript(${meetingId})">📝 Transcript</button>`;
+  }
+  if (livestreamUrl) {
+    buttons += `<a class="btn btn-outline btn-sm" style="margin-top:8px;" 
+      href="${escHtml(livestreamUrl)}" target="_blank" onclick="event.stopPropagation()">📺 Live</a>`;
+  }
   toast.innerHTML = `
-    <div class="toast-badge">${type === 'news' ? '📰 ANP' : '🏛️ Melding'}</div>
+    <div class="toast-badge">${badge}</div>
     <div class="toast-title">${escHtml(title)}</div>
-    <div class="toast-text">${escHtml(text)}</div>
+    <div class="toast-text">${escHtml(text.substring(0, 200))}${text.length > 200 ? '...' : ''}</div>
+    ${buttons}
   `;
   toast.onclick = () => {
     navigate('alerts');
     toast.remove();
   };
   container.appendChild(toast);
-  setTimeout(() => toast.remove(), 8000);
+  setTimeout(() => toast.remove(), 12000);
 
   // Browser notification
   if (Notification.permission === 'granted') {
-    new Notification(title, { body: text, icon: '/static/icon-192.png' });
+    new Notification(title, { body: text.substring(0, 120), icon: '/static/icon-192.png' });
   }
+}
+
+// ── Transcript search ──
+function searchTranscript() {
+  const query = document.getElementById('transcript-search').value.toLowerCase();
+  const chunks = document.querySelectorAll('#transcript-chunks .chunk');
+  chunks.forEach(chunk => {
+    const text = chunk.querySelector('.text')?.textContent?.toLowerCase() || '';
+    const speaker = chunk.querySelector('.speaker')?.textContent?.toLowerCase() || '';
+    if (!query || text.includes(query) || speaker.includes(query)) {
+      chunk.style.display = '';
+      chunk.classList.remove('highlighted');
+      if (query && (text.includes(query) || speaker.includes(query))) {
+        chunk.classList.add('highlighted');
+      }
+    } else {
+      chunk.style.display = 'none';
+    }
+  });
 }
 
 function escHtml(s) {

@@ -58,7 +58,7 @@ class LoginRequest(BaseModel):
     password: str
 
 class PreferencesRequest(BaseModel):
-    topics: List[str] = []
+    topics: dict = {}      # {topic_id: level} bijv. {'wonen_ruimte': 'bestuurlijk'}
     gemeenten: List[str] = []
 
 # ── Auth endpoints ─────────────────────────────────────────────────────────
@@ -117,7 +117,13 @@ def set_prefs(req: PreferencesRequest, user: dict = Depends(_require_user)):
 
 @app.get("/api/topics")
 def get_topics():
-    return config.TOPICS
+    return {
+        'topics': config.TOPICS,
+        'interest_levels': {
+            k: {'label': v['label'], 'description': v['description']}
+            for k, v in config.INTEREST_LEVELS.items()
+        },
+    }
 
 
 @app.get("/api/gemeenten")
@@ -307,8 +313,12 @@ async def demo_start(user: dict = Depends(_require_user)):
 
 
 async def _demo_playback(meeting_id, gemeente):
-    """Speel demo-transcript af met versnelde timing."""
-    prefs_cache = {}  # user_id -> preferences
+    """Speel demo-transcript af met versnelde timing.
+
+    Simuleert iteratieve analyse: elke 3 chunks (≈ 90 sec demo = 15 min echt)
+    analyseert het rolling window voor alle topics × kanalen.
+    """
+    transcript_buffer = []
 
     for i, chunk in enumerate(DEMO_TRANSCRIPT):
         # Voeg transcript chunk toe
@@ -319,49 +329,46 @@ async def _demo_playback(meeting_id, gemeente):
             start_time=chunk['time'],
             end_time=chunk['time'] + 30,
         )
+        transcript_buffer.append(chunk['text'])
 
-        # Analyseer elke chunk (in demo draaien we analyse vaker)
-        result = analysis.analyze_fragment(chunk['text'], gemeente)
+        # Analyseer elke 3 chunks (simuleert 5-minuten interval)
+        if (i + 1) % 3 == 0 or i == len(DEMO_TRANSCRIPT) - 1:
+            window_text = ' '.join(transcript_buffer)
+            alerts = analysis.analyze_window_for_all_topics(
+                text=window_text,
+                gemeente=gemeente,
+                meeting_id=meeting_id,
+                livestream_url=None,
+            )
 
-        if result['relevant']:
-            for topic_data in result['topics']:
-                if topic_data['score'] >= config.SECTOR_SCORE_THRESHOLD:
-                    alert_id = db.create_alert(
-                        meeting_id=meeting_id,
-                        gemeente=gemeente,
-                        topic=topic_data['topic'],
-                        title=f"{gemeente}: {topic_data['name']}",
-                        summary=result['summary'] or chunk['text'][:150],
-                        quote=chunk['text'][:200],
-                        score=topic_data['score'],
-                        alert_type='sector',
-                        t_start=chunk['time'],
-                        t_end=chunk['time'] + 30,
-                    )
-                    # Push naar alle verbonden gebruikers met deze topic
-                    await _push_to_matching_users(alert_id, topic_data['topic'], gemeente)
-
-            if result['is_newsworthy']:
+            for alert_data in alerts:
                 alert_id = db.create_alert(
                     meeting_id=meeting_id,
                     gemeente=gemeente,
-                    topic='nieuws',
-                    title=f"ANP: {gemeente}",
-                    summary=result['summary'] or chunk['text'][:150],
-                    quote=chunk['text'][:200],
-                    score=result['news_score'],
-                    alert_type='anp',
-                    t_start=chunk['time'],
+                    topic=alert_data['topic'],
+                    level=alert_data['level'],
+                    title=alert_data['title'],
+                    summary=alert_data['summary'],
+                    score=alert_data['score'],
+                    indicators=alert_data.get('indicators'),
+                    livestream_url=alert_data.get('livestream_url'),
+                    quote=window_text[:200],
+                    t_start=chunk['time'] - 90,
                     t_end=chunk['time'] + 30,
                 )
-                await _push_to_matching_users(alert_id, None, gemeente, anp=True)
+                await _push_to_matching_users(
+                    alert_id, alert_data['topic'], alert_data['level'], gemeente
+                )
 
-        # Wacht 3 seconden tussen chunks in demo modus (= ~15 min vergadering in ~45 seconden)
+            # Reset buffer na analyse (maar bewaar overlap voor volgende window)
+            transcript_buffer = transcript_buffer[-2:]  # bewaar laatste 2 chunks als overlap
+
+        # Wacht 3 seconden tussen chunks in demo modus
         await asyncio.sleep(3)
 
 
-async def _push_to_matching_users(alert_id, topic, gemeente, anp=False):
-    """Push alert naar alle SSE clients die matchen."""
+async def _push_to_matching_users(alert_id, topic, level, gemeente):
+    """Push alert naar alle SSE clients die matchen op topic + level."""
     udb = db.get_users_db()
     alert = udb.execute("SELECT * FROM alerts WHERE id = ?", (alert_id,)).fetchone()
     if not alert:
@@ -372,22 +379,57 @@ async def _push_to_matching_users(alert_id, topic, gemeente, anp=False):
     alert_data['type_event'] = 'alert'
 
     for user_id, queues in list(_sse_clients.items()):
-        # Check of user geinteresseerd is
-        if anp:
-            user = udb.execute("SELECT role FROM users WHERE id = ?", (user_id,)).fetchone()
-            if user and user['role'] == 'anp':
-                for q in queues:
-                    await q.put(alert_data)
-        elif topic:
-            match = udb.execute(
-                "SELECT 1 FROM user_topics WHERE user_id = ? AND topic = ?",
-                (user_id, topic)
-            ).fetchone()
-            if match:
-                for q in queues:
-                    await q.put(alert_data)
+        if not topic:
+            continue
+        # Check of user dit topic op het juiste level heeft
+        match = udb.execute(
+            "SELECT level FROM user_topics WHERE user_id = ? AND topic = ?",
+            (user_id, topic)
+        ).fetchone()
+        if match and match['level'] == level:
+            for q in queues:
+                await q.put(alert_data)
 
     udb.close()
+
+
+# ── Temp alerts (terugzoeken, max 1 uur) ───────────────────────────────────
+
+@app.get("/api/temp-alerts")
+def get_temp_alerts_endpoint(
+    user: dict = Depends(_require_user),
+    level: Optional[str] = None,
+    topic: Optional[str] = None,
+    limit: int = 50
+):
+    """Haal recente temp alerts op (max 1 uur oud), gefilterd op user-voorkeuren."""
+    prefs = db.get_preferences(user['id'])
+    all_alerts = analysis.get_temp_alerts(level=level, topic=topic, limit=limit * 3)
+
+    # Filter op user-voorkeuren
+    filtered = []
+    for alert in all_alerts:
+        a_topic = alert.get('topic')
+        a_level = alert.get('level')
+        if a_topic in prefs['topics'] and prefs['topics'][a_topic] == a_level:
+            filtered.append(alert)
+        if len(filtered) >= limit:
+            break
+    return filtered
+
+
+# ── Transcript zoeken ──────────────────────────────────────────────────────
+
+@app.get("/api/transcript/{meeting_id}/search")
+def search_transcript(meeting_id: int, q: str = Query(..., min_length=2)):
+    """Doorzoek het transcript van een vergadering."""
+    chunks = db.get_transcript(meeting_id)
+    results = []
+    query_lower = q.lower()
+    for chunk in chunks:
+        if query_lower in chunk.get('text', '').lower():
+            results.append(chunk)
+    return results
 
 
 # ── Stats ──────────────────────────────────────────────────────────────────

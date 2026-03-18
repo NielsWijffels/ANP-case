@@ -3,6 +3,7 @@ Database module — gebruikers, voorkeuren, alerts en transcripten.
 Aparte SQLite database (users.db) naast de bestaande meetings.db.
 """
 import hashlib
+import json
 import os
 import secrets
 import sqlite3
@@ -45,6 +46,7 @@ def get_users_db():
         CREATE TABLE IF NOT EXISTS user_topics (
             user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             topic       TEXT NOT NULL,
+            level       TEXT NOT NULL DEFAULT 'geen',
             PRIMARY KEY (user_id, topic)
         );
 
@@ -65,11 +67,13 @@ def get_users_db():
             meeting_id      INTEGER,
             gemeente        TEXT,
             topic           TEXT,
+            level           TEXT,
             title           TEXT,
             summary         TEXT,
             quote           TEXT,
             score           REAL,
-            type            TEXT,
+            indicators      TEXT,
+            livestream_url  TEXT,
             timestamp_start REAL,
             timestamp_end   REAL,
             created_at      TEXT DEFAULT (datetime('now'))
@@ -97,6 +101,35 @@ def get_users_db():
         CREATE INDEX IF NOT EXISTS idx_alerts_created
             ON alerts(created_at);
     """)
+
+    # Migratie: voeg 'level' kolom toe aan user_topics als die ontbreekt
+    try:
+        conn.execute("SELECT level FROM user_topics LIMIT 1")
+    except sqlite3.OperationalError:
+        conn.execute("ALTER TABLE user_topics ADD COLUMN level TEXT NOT NULL DEFAULT 'geen'")
+        conn.commit()
+
+    # Migratie: voeg 'level' kolom toe aan alerts als die ontbreekt
+    try:
+        conn.execute("SELECT level FROM alerts LIMIT 1")
+    except sqlite3.OperationalError:
+        conn.execute("ALTER TABLE alerts ADD COLUMN level TEXT")
+        conn.commit()
+
+    # Migratie: voeg 'indicators' kolom toe aan alerts als die ontbreekt
+    try:
+        conn.execute("SELECT indicators FROM alerts LIMIT 1")
+    except sqlite3.OperationalError:
+        conn.execute("ALTER TABLE alerts ADD COLUMN indicators TEXT")
+        conn.commit()
+
+    # Migratie: voeg 'livestream_url' kolom toe aan alerts als die ontbreekt
+    try:
+        conn.execute("SELECT livestream_url FROM alerts LIMIT 1")
+    except sqlite3.OperationalError:
+        conn.execute("ALTER TABLE alerts ADD COLUMN livestream_url TEXT")
+        conn.commit()
+
     conn.commit()
     return conn
 
@@ -170,9 +203,11 @@ def delete_token(token):
 
 def get_preferences(user_id):
     conn = get_users_db()
-    topics = [r['topic'] for r in conn.execute(
-        "SELECT topic FROM user_topics WHERE user_id = ?", (user_id,)
-    ).fetchall()]
+    # Topics met interest level (geen/bestuurlijk/pers)
+    topic_rows = conn.execute(
+        "SELECT topic, level FROM user_topics WHERE user_id = ?", (user_id,)
+    ).fetchall()
+    topics = {r['topic']: r['level'] for r in topic_rows}
     gemeenten = [r['gemeente'] for r in conn.execute(
         "SELECT gemeente FROM user_gemeenten WHERE user_id = ?", (user_id,)
     ).fetchall()]
@@ -181,14 +216,29 @@ def get_preferences(user_id):
 
 
 def set_preferences(user_id, topics=None, gemeenten=None):
+    """Sla voorkeuren op.
+
+    topics: dict {topic_id: level} bijv. {'wonen_ruimte': 'bestuurlijk', ...}
+            of list [topic_id, ...] (backwards compat, zet level op 'bestuurlijk')
+    gemeenten: list [gemeente_naam, ...]
+    """
     conn = get_users_db()
     if topics is not None:
         conn.execute("DELETE FROM user_topics WHERE user_id = ?", (user_id,))
-        for t in topics:
-            conn.execute(
-                "INSERT OR IGNORE INTO user_topics (user_id, topic) VALUES (?,?)",
-                (user_id, t)
-            )
+        if isinstance(topics, dict):
+            for topic_id, level in topics.items():
+                if level and level != 'geen':
+                    conn.execute(
+                        "INSERT OR IGNORE INTO user_topics (user_id, topic, level) VALUES (?,?,?)",
+                        (user_id, topic_id, level)
+                    )
+        else:
+            # Backwards compatible: list → level 'bestuurlijk'
+            for t in topics:
+                conn.execute(
+                    "INSERT OR IGNORE INTO user_topics (user_id, topic, level) VALUES (?,?,?)",
+                    (user_id, t, 'bestuurlijk')
+                )
     if gemeenten is not None:
         conn.execute("DELETE FROM user_gemeenten WHERE user_id = ?", (user_id,))
         for g in gemeenten:
@@ -202,31 +252,46 @@ def set_preferences(user_id, topics=None, gemeenten=None):
 
 # ── Alerts ─────────────────────────────────────────────────────────────────
 
-def create_alert(meeting_id, gemeente, topic, title, summary, quote,
-                 score, alert_type, t_start=None, t_end=None):
+def create_alert(meeting_id, gemeente, topic, level, title, summary,
+                 score, indicators=None, livestream_url=None,
+                 quote=None, t_start=None, t_end=None):
+    """Maak een alert aan en koppel aan relevante gebruikers.
+
+    level: 'pers' of 'bestuurlijk'
+    Routing: gebruikers die dit topic op dit level (of hoger) hebben staan.
+    """
     conn = get_users_db()
+    indicators_json = json.dumps(indicators) if indicators else None
     cur = conn.execute(
-        "INSERT INTO alerts (meeting_id, gemeente, topic, title, summary, "
-        "quote, score, type, timestamp_start, timestamp_end) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?)",
-        (meeting_id, gemeente, topic, title, summary, quote,
-         score, alert_type, t_start, t_end)
+        "INSERT INTO alerts (meeting_id, gemeente, topic, level, title, summary, "
+        "quote, score, indicators, livestream_url, timestamp_start, timestamp_end) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        (meeting_id, gemeente, topic, level, title, summary,
+         quote, score, indicators_json, livestream_url, t_start, t_end)
     )
     alert_id = cur.lastrowid
 
-    # Koppel alert aan relevante gebruikers
-    if alert_type == 'anp':
-        # ANP alerts gaan naar alle ANP-gebruikers
-        users = conn.execute(
-            "SELECT id FROM users WHERE role = 'anp'"
-        ).fetchall()
-    else:
-        # Sector alerts: match op topic + gemeente
+    # Koppel alert aan gebruikers met matching topic + level + gemeente
+    if level == 'pers':
+        # Pers-alerts gaan naar gebruikers met dit topic op 'pers' niveau
         users = conn.execute(
             "SELECT DISTINCT u.id FROM users u "
             "JOIN user_topics ut ON ut.user_id = u.id "
             "LEFT JOIN user_gemeenten ug ON ug.user_id = u.id "
-            "WHERE ut.topic = ? AND (ug.gemeente = ? OR ug.gemeente IS NULL)",
+            "WHERE ut.topic = ? AND ut.level = 'pers' "
+            "AND (ug.gemeente = ? OR ug.gemeente IS NULL "
+            "     OR NOT EXISTS (SELECT 1 FROM user_gemeenten WHERE user_id = u.id))",
+            (topic, gemeente)
+        ).fetchall()
+    else:
+        # Bestuurlijk-alerts gaan naar gebruikers met dit topic op 'bestuurlijk'
+        users = conn.execute(
+            "SELECT DISTINCT u.id FROM users u "
+            "JOIN user_topics ut ON ut.user_id = u.id "
+            "LEFT JOIN user_gemeenten ug ON ug.user_id = u.id "
+            "WHERE ut.topic = ? AND ut.level = 'bestuurlijk' "
+            "AND (ug.gemeente = ? OR ug.gemeente IS NULL "
+            "     OR NOT EXISTS (SELECT 1 FROM user_gemeenten WHERE user_id = u.id))",
             (topic, gemeente)
         ).fetchall()
 
