@@ -264,6 +264,77 @@ async def push_alert_to_user(user_id: int, alert_data: dict):
             await queue.put(alert_data)
 
 
+# ── Ingest endpoint (voor externe systemen zoals Colab) ────────────────────
+
+class IngestChunkRequest(BaseModel):
+    meeting_id: int
+    text: str
+    speaker: Optional[str] = None
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
+    gemeente: Optional[str] = None
+    livestream_url: Optional[str] = None
+
+
+@app.post("/api/ingest/chunk")
+async def ingest_chunk(req: IngestChunkRequest):
+    """Ontvang een transcript chunk van een extern systeem (bijv. Colab).
+
+    Slaat de chunk op en triggert analyse elke 3 chunks.
+    Speaker-naam wordt direct meegenomen — zorg dat de bron (NotUBiz,
+    OCR, pyannote) de naam al heeft opgelost.
+    """
+    db.add_transcript_chunk(
+        meeting_id=req.meeting_id,
+        text=req.text,
+        speaker=req.speaker,
+        start_time=req.start_time,
+        end_time=req.end_time,
+    )
+
+    # Haal het hele recent window op (met speaker-attributie)
+    chunk_count = _ingest_counters.get(req.meeting_id, 0) + 1
+    _ingest_counters[req.meeting_id] = chunk_count
+
+    # Analyseer elke 3 chunks
+    if chunk_count % 3 == 0:
+        window_text = db.get_window_text(req.meeting_id)
+        recent_alerts = db.get_recent_alerts_for_meeting(req.meeting_id)
+        alerts = analysis.analyze_window_for_all_topics(
+            text=window_text,
+            gemeente=req.gemeente,
+            meeting_id=req.meeting_id,
+            livestream_url=req.livestream_url,
+            recent_alerts=recent_alerts,
+        )
+        for alert_data in alerts:
+            alert_id = db.create_alert(
+                meeting_id=req.meeting_id,
+                gemeente=req.gemeente,
+                topic=alert_data['topic'],
+                level=alert_data['level'],
+                title=alert_data['title'],
+                summary=alert_data['summary'],
+                score=alert_data['score'],
+                indicators=alert_data.get('indicators'),
+                livestream_url=alert_data.get('livestream_url'),
+                quote=window_text[:200],
+                t_start=req.start_time,
+                t_end=req.end_time,
+            )
+            await _push_to_matching_users(
+                alert_id, alert_data['topic'], alert_data['level'],
+                req.gemeente
+            )
+        return {"ingested": True, "analyzed": True, "alerts": len(alerts)}
+
+    return {"ingested": True, "analyzed": False}
+
+
+# Teller voor ingest chunks per meeting (voor analyse-trigger)
+_ingest_counters: Dict[int, int] = {}
+
+
 # ── Demo endpoints ─────────────────────────────────────────────────────────
 
 DEMO_TRANSCRIPT = [
@@ -329,7 +400,9 @@ async def _demo_playback(meeting_id, gemeente):
             start_time=chunk['time'],
             end_time=chunk['time'] + 30,
         )
-        transcript_buffer.append(chunk['text'])
+        # Buffer met speaker-attributie zodat LLM weet wie wat zegt
+        speaker = chunk.get('speaker', 'Spreker')
+        transcript_buffer.append(f"{speaker}: {chunk['text']}")
 
         # Analyseer elke 3 chunks (simuleert 5-minuten interval)
         if (i + 1) % 3 == 0 or i == len(DEMO_TRANSCRIPT) - 1:

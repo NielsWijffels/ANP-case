@@ -387,3 +387,25 @@ def get_recent_alerts_for_meeting(meeting_id, limit=20):
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def get_window_text(meeting_id, last_n_seconds=1800):
+    """Haal transcript-tekst met speaker-attributie op voor analyse.
+
+    Returns tekst in formaat: 'Spreker: tekst\nSpreker: tekst\n...'
+    zodat de LLM weet wie wat zegt.
+    """
+    conn = get_users_db()
+    rows = conn.execute(
+        "SELECT speaker, text FROM transcript_chunks "
+        "WHERE meeting_id = ? "
+        "ORDER BY start_time DESC LIMIT ?",
+        (meeting_id, last_n_seconds // 15)  # ~1 chunk per 15 sec
+    ).fetchall()
+    conn.close()
+    rows = list(reversed(rows))
+    lines = []
+    for r in rows:
+        speaker = r['speaker'] or 'Spreker'
+        lines.append(f"{speaker}: {r['text']}")
+    return '\n'.join(lines)
