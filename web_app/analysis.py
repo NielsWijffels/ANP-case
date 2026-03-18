@@ -270,10 +270,74 @@ def generate_bestuurlijk_summary(text, topic_name, gemeente):
     return None
 
 
+# ── Deduplicatie ───────────────────────────────────────────────────────────
+
+def _tokenize(text):
+    """Simpele tokenisatie: lowercase woorden, min 3 chars."""
+    return set(w for w in text.lower().split() if len(w) >= 3)
+
+
+def _similarity(text_a, text_b):
+    """Jaccard-similariteit tussen twee teksten (0.0 – 1.0)."""
+    if not text_a or not text_b:
+        return 0.0
+    tokens_a = _tokenize(text_a)
+    tokens_b = _tokenize(text_b)
+    if not tokens_a or not tokens_b:
+        return 0.0
+    intersection = tokens_a & tokens_b
+    union = tokens_a | tokens_b
+    return len(intersection) / len(union)
+
+
+def _new_keywords(new_text, old_text):
+    """Vind relevante keywords in new_text die niet in old_text voorkomen."""
+    all_kw = set(NEWS_KEYWORDS_PERS + BESTUURLIJK_KEYWORDS)
+    new_lower = new_text.lower()
+    old_lower = old_text.lower()
+    return [kw for kw in all_kw if kw in new_lower and kw not in old_lower]
+
+
+def _check_dedup(new_summary, new_title, topic_id, level, recent_alerts):
+    """Check of een nieuwe alert een duplicaat is van recente alerts.
+
+    Returns:
+        ('skip', None)       — te veel overlap, niet versturen
+        ('update', summary)  — relevante nieuwe info, prefix 'Update: '
+        ('new', None)        — nieuw bericht, gewoon versturen
+    """
+    SIMILARITY_SKIP = 0.70   # >= 70% overlap → duplicaat, skippen
+    SIMILARITY_UPDATE = 0.35 # 35-70% overlap → mogelijk update
+
+    for prev in recent_alerts:
+        if prev.get('topic') != topic_id or prev.get('level') != level:
+            continue
+
+        prev_summary = prev.get('summary', '')
+        sim = _similarity(new_summary, prev_summary)
+
+        if sim >= SIMILARITY_SKIP:
+            # Te veel overlap → duplicaat
+            return ('skip', None)
+
+        if sim >= SIMILARITY_UPDATE:
+            # Gedeeltelijke overlap — check of er nieuwe keywords zijn
+            new_kw = _new_keywords(new_summary, prev_summary)
+            if len(new_kw) >= 2:
+                # Voldoende nieuwe inhoud → Update-bericht
+                return ('update', None)
+            else:
+                # Niet genoeg nieuws → skippen
+                return ('skip', None)
+
+    # Geen overlap met eerdere alerts
+    return ('new', None)
+
+
 # ── Iteratieve analyse (elke 5 min, rolling 30 min window) ────────────────
 
 def analyze_window_for_all_topics(text, gemeente=None, meeting_id=None,
-                                  livestream_url=None):
+                                  livestream_url=None, recent_alerts=None):
     """Analyseer een 30-minuten rolling window voor alle onderwerpen en kanalen.
 
     Produceert alerts per topic × kanaal combinatie.
@@ -283,6 +347,9 @@ def analyze_window_for_all_topics(text, gemeente=None, meeting_id=None,
     """
     if not text or len(text.strip()) < 50:
         return []
+
+    if recent_alerts is None:
+        recent_alerts = []
 
     fragment = analyze_fragment(text, gemeente)
     alerts = []
@@ -301,21 +368,34 @@ def analyze_window_for_all_topics(text, gemeente=None, meeting_id=None,
                 pers_summary = fragment['summary'][:300] if fragment['summary'] else None
 
             if pers_summary:
-                alert = {
-                    'topic': topic_id,
-                    'topic_name': topic_name,
-                    'level': 'pers',
-                    'title': f"{gemeente}: {topic_name}",
-                    'summary': pers_summary,
-                    'score': fragment['pers_score'],
-                    'indicators': fragment['pers_indicators'],
-                    'gemeente': gemeente,
-                    'meeting_id': meeting_id,
-                    'livestream_url': livestream_url,
-                    'timestamp': timestamp,
-                    'has_transcript': True,
-                }
-                alerts.append(alert)
+                # Deduplicatie check
+                dedup, _ = _check_dedup(
+                    pers_summary, f"{gemeente}: {topic_name}",
+                    topic_id, 'pers', recent_alerts,
+                )
+                if dedup == 'skip':
+                    pass  # Duplicaat — niet versturen
+                else:
+                    title = f"{gemeente}: {topic_name}"
+                    if dedup == 'update':
+                        title = f"Update: {title}"
+                        pers_summary = f"Update: {pers_summary}"
+                    alert = {
+                        'topic': topic_id,
+                        'topic_name': topic_name,
+                        'level': 'pers',
+                        'title': title,
+                        'summary': pers_summary,
+                        'score': fragment['pers_score'],
+                        'indicators': fragment['pers_indicators'],
+                        'gemeente': gemeente,
+                        'meeting_id': meeting_id,
+                        'livestream_url': livestream_url,
+                        'timestamp': timestamp,
+                        'has_transcript': True,
+                    }
+                    alerts.append(alert)
+                    recent_alerts.append(alert)  # Toevoegen aan recente alerts
 
         # ── Bestuurlijk kanaal ──
         if fragment['is_bestuurlijk_relevant'] and topic_score >= 0.15:
@@ -324,21 +404,34 @@ def analyze_window_for_all_topics(text, gemeente=None, meeting_id=None,
                 bestuurlijk_summary = fragment['summary'][:500] if fragment['summary'] else None
 
             if bestuurlijk_summary:
-                alert = {
-                    'topic': topic_id,
-                    'topic_name': topic_name,
-                    'level': 'bestuurlijk',
-                    'title': f"{gemeente}: {topic_name}",
-                    'summary': bestuurlijk_summary,
-                    'score': fragment['bestuurlijk_score'],
-                    'indicators': fragment['bestuurlijk_indicators'],
-                    'gemeente': gemeente,
-                    'meeting_id': meeting_id,
-                    'livestream_url': livestream_url,
-                    'timestamp': timestamp,
-                    'has_transcript': True,
-                }
-                alerts.append(alert)
+                # Deduplicatie check
+                dedup, _ = _check_dedup(
+                    bestuurlijk_summary, f"{gemeente}: {topic_name}",
+                    topic_id, 'bestuurlijk', recent_alerts,
+                )
+                if dedup == 'skip':
+                    pass  # Duplicaat — niet versturen
+                else:
+                    title = f"{gemeente}: {topic_name}"
+                    if dedup == 'update':
+                        title = f"Update: {title}"
+                        bestuurlijk_summary = f"Update: {bestuurlijk_summary}"
+                    alert = {
+                        'topic': topic_id,
+                        'topic_name': topic_name,
+                        'level': 'bestuurlijk',
+                        'title': title,
+                        'summary': bestuurlijk_summary,
+                        'score': fragment['bestuurlijk_score'],
+                        'indicators': fragment['bestuurlijk_indicators'],
+                        'gemeente': gemeente,
+                        'meeting_id': meeting_id,
+                        'livestream_url': livestream_url,
+                        'timestamp': timestamp,
+                        'has_transcript': True,
+                    }
+                    alerts.append(alert)
+                    recent_alerts.append(alert)  # Toevoegen aan recente alerts
 
     # Sla alerts op in temp map (1 uur bewaard)
     _save_temp_alerts(alerts, meeting_id)

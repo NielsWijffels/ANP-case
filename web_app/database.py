@@ -375,3 +375,15 @@ def get_recent_text(meeting_id, last_n_minutes=5):
     conn.close()
     rows = list(reversed(rows))
     return ' '.join(r['text'] for r in rows)
+
+
+def get_recent_alerts_for_meeting(meeting_id, limit=20):
+    """Haal recente alerts voor een meeting op (voor deduplicatie)."""
+    conn = get_users_db()
+    rows = conn.execute(
+        "SELECT topic, level, title, summary, score FROM alerts "
+        "WHERE meeting_id = ? ORDER BY created_at DESC LIMIT ?",
+        (meeting_id, limit)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]

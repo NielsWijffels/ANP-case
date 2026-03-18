@@ -334,11 +334,14 @@ async def _demo_playback(meeting_id, gemeente):
         # Analyseer elke 3 chunks (simuleert 5-minuten interval)
         if (i + 1) % 3 == 0 or i == len(DEMO_TRANSCRIPT) - 1:
             window_text = ' '.join(transcript_buffer)
+            # Haal recente alerts op voor deduplicatie
+            recent_alerts = db.get_recent_alerts_for_meeting(meeting_id)
             alerts = analysis.analyze_window_for_all_topics(
                 text=window_text,
                 gemeente=gemeente,
                 meeting_id=meeting_id,
                 livestream_url=None,
+                recent_alerts=recent_alerts,
             )
 
             for alert_data in alerts:
