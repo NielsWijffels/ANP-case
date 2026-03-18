@@ -1,0 +1,21 @@
+{
+  "name": "RANST",
+  "short_name": "RANST",
+  "description": "Raadsinformatie Analyse & Notificatie Systeem",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f8fc",
+  "theme_color": "#1a365d",
+  "icons": [
+    {
+      "src": "/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1a365d">
+<title>RANST — Raadsinformatie Analyse & Notificatie Systeem</title>
+<link rel="manifest" href="/manifest.json">
+<style>
+:root {
+  --bg: #f7f8fc;
+  --card: #ffffff;
+  --primary: #1a365d;
+  --primary-light: #2c5282;
+  --accent: #e67e22;
+  --accent-light: #f39c12;
+  --text: #2d3748;
+  --text-light: #718096;
+  --border: #e2e8f0;
+  --success: #38a169;
+  --danger: #e53e3e;
+  --radius: 12px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-lg: 0 4px 14px rgba(0,0,0,0.1);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg); color: var(--text); line-height:1.6;
+}
+a { color: var(--primary-light); text-decoration:none; }
+
+/* ── Layout ── */
+.app { display:flex; min-height:100vh; }
+.sidebar {
+  width:260px; background:var(--primary); color:#fff;
+  padding:24px 0; display:flex; flex-direction:column;
+  position:fixed; top:0; left:0; bottom:0; z-index:100;
+}
+.sidebar h1 { padding:0 24px 8px; font-size:20px; letter-spacing:1px; }
+.sidebar .subtitle { padding:0 24px 24px; font-size:11px; opacity:.6; }
+.sidebar nav { flex:1; }
+.sidebar nav a {
+  display:flex; align-items:center; gap:12px;
+  padding:12px 24px; color:#cbd5e0; transition:.2s;
+}
+.sidebar nav a:hover, .sidebar nav a.active { background:rgba(255,255,255,.1); color:#fff; }
+.sidebar nav a .icon { font-size:18px; width:24px; text-align:center; }
+.sidebar .user-info {
+  padding:16px 24px; border-top:1px solid rgba(255,255,255,.1);
+  font-size:13px;
+}
+.sidebar .user-info .email { opacity:.7; font-size:11px; }
+
+.main { margin-left:260px; flex:1; padding:32px; max-width:1200px; }
+
+/* ── Auth ── */
+.auth-container {
+  max-width:400px; margin:80px auto; background:var(--card);
+  border-radius:var(--radius); box-shadow:var(--shadow-lg); padding:48px;
+}
+.auth-container h1 { color:var(--primary); margin-bottom:8px; }
+.auth-container .subtitle { color:var(--text-light); margin-bottom:32px; font-size:14px; }
+.auth-container .tabs { display:flex; gap:0; margin-bottom:24px; }
+.auth-container .tabs button {
+  flex:1; padding:10px; border:2px solid var(--border); background:none;
+  cursor:pointer; font-size:14px; color:var(--text-light); transition:.2s;
+}
+.auth-container .tabs button:first-child { border-radius:8px 0 0 8px; }
+.auth-container .tabs button:last-child { border-radius:0 8px 8px 0; }
+.auth-container .tabs button.active {
+  background:var(--primary); color:#fff; border-color:var(--primary);
+}
+
+/* ── Forms ── */
+.form-group { margin-bottom:16px; }
+.form-group label { display:block; font-size:13px; font-weight:600; margin-bottom:4px; }
+.form-group input, .form-group select {
+  width:100%; padding:10px 14px; border:1px solid var(--border);
+  border-radius:8px; font-size:14px; transition:.2s;
+}
+.form-group input:focus, .form-group select:focus {
+  outline:none; border-color:var(--primary-light); box-shadow:0 0 0 3px rgba(44,82,130,.15);
+}
+.btn {
+  padding:10px 20px; border:none; border-radius:8px; font-size:14px;
+  font-weight:600; cursor:pointer; transition:.2s; display:inline-flex;
+  align-items:center; gap:8px;
+}
+.btn-primary { background:var(--primary); color:#fff; }
+.btn-primary:hover { background:var(--primary-light); }
+.btn-accent { background:var(--accent); color:#fff; }
+.btn-accent:hover { background:var(--accent-light); }
+.btn-outline { background:none; border:2px solid var(--border); color:var(--text); }
+.btn-outline:hover { border-color:var(--primary); color:var(--primary); }
+.btn-block { width:100%; justify-content:center; }
+.btn-sm { padding:6px 14px; font-size:12px; }
+
+/* ── Cards ── */
+.card {
+  background:var(--card); border-radius:var(--radius);
+  box-shadow:var(--shadow); padding:24px; margin-bottom:16px;
+}
+.card h2 { font-size:18px; margin-bottom:16px; }
+.card h3 { font-size:15px; margin-bottom:8px; }
+
+.stats-grid {
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr));
+  gap:16px; margin-bottom:24px;
+}
+.stat-card {
+  background:var(--card); border-radius:var(--radius); padding:20px;
+  box-shadow:var(--shadow); text-align:center;
+}
+.stat-card .number { font-size:32px; font-weight:700; color:var(--primary); }
+.stat-card .label { font-size:12px; color:var(--text-light); margin-top:4px; }
+
+/* ── Meeting list ── */
+.meeting-item {
+  display:flex; align-items:flex-start; gap:16px; padding:16px 0;
+  border-bottom:1px solid var(--border);
+}
+.meeting-item:last-child { border:none; }
+.meeting-time {
+  font-size:14px; font-weight:700; color:var(--primary);
+  min-width:50px; padding-top:2px;
+}
+.meeting-info { flex:1; }
+.meeting-info .gemeente { font-weight:600; font-size:15px; }
+.meeting-info .titel { color:var(--text-light); font-size:13px; }
+.meeting-info .url { font-size:12px; margin-top:4px; }
+.badge {
+  display:inline-block; padding:2px 10px; border-radius:12px;
+  font-size:11px; font-weight:600;
+}
+.badge-live { background:#fed7d7; color:var(--danger); }
+.badge-scheduled { background:#e2e8f0; color:var(--text-light); }
+.badge-stream { background:#c6f6d5; color:var(--success); }
+
+/* ── Alerts ── */
+.alert-item {
+  display:flex; gap:16px; padding:16px; margin-bottom:12px;
+  border-radius:var(--radius); border-left:4px solid var(--accent);
+  background:var(--card); box-shadow:var(--shadow); cursor:pointer;
+  transition:.2s;
+}
+.alert-item:hover { box-shadow:var(--shadow-lg); transform:translateY(-1px); }
+.alert-item.unread { border-left-color:var(--danger); }
+.alert-item .alert-badge {
+  font-size:11px; font-weight:700; text-transform:uppercase;
+  color:var(--accent); margin-bottom:4px;
+}
+.alert-item.unread .alert-badge { color:var(--danger); }
+.alert-item .alert-title { font-weight:600; font-size:14px; }
+.alert-item .alert-summary { color:var(--text-light); font-size:13px; margin-top:4px; }
+.alert-item .alert-time { font-size:11px; color:var(--text-light); margin-top:6px; }
+
+/* ── Preferences ── */
+.topic-grid {
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr));
+  gap:12px;
+}
+.topic-chip {
+  display:flex; align-items:center; gap:10px; padding:12px 16px;
+  border:2px solid var(--border); border-radius:8px; cursor:pointer;
+  transition:.2s; user-select:none;
+}
+.topic-chip:hover { border-color:var(--primary-light); }
+.topic-chip.selected { border-color:var(--primary); background:rgba(26,54,93,.06); }
+.topic-chip input { display:none; }
+.topic-chip .check {
+  width:20px; height:20px; border-radius:6px; border:2px solid var(--border);
+  display:flex; align-items:center; justify-content:center; transition:.2s;
+}
+.topic-chip.selected .check {
+  background:var(--primary); border-color:var(--primary); color:#fff;
+}
+
+.gemeente-search {
+  position:relative; margin-bottom:16px;
+}
+.gemeente-search input {
+  width:100%; padding:10px 14px; border:1px solid var(--border);
+  border-radius:8px; font-size:14px;
+}
+.gemeente-tags {
+  display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;
+}
+.gemeente-tag {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:4px 12px; background:var(--primary); color:#fff;
+  border-radius:16px; font-size:12px;
+}
+.gemeente-tag .remove { cursor:pointer; opacity:.7; }
+.gemeente-tag .remove:hover { opacity:1; }
+.gemeente-dropdown {
+  position:absolute; top:100%; left:0; right:0;
+  background:var(--card); border:1px solid var(--border);
+  border-radius:8px; max-height:200px; overflow-y:auto;
+  box-shadow:var(--shadow-lg); z-index:50; display:none;
+}
+.gemeente-dropdown.open { display:block; }
+.gemeente-dropdown div {
+  padding:8px 14px; cursor:pointer; font-size:13px;
+}
+.gemeente-dropdown div:hover { background:var(--bg); }
+
+/* ── Transcript ── */
+.transcript-header {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:16px;
+}
+.transcript-chunks { max-height:60vh; overflow-y:auto; padding:8px 0; }
+.chunk {
+  padding:12px 16px; margin-bottom:8px; border-radius:8px;
+  background:var(--bg); transition:.2s;
+}
+.chunk.highlighted { background:#fefcbf; border-left:3px solid var(--accent); }
+.chunk .speaker {
+  font-weight:700; font-size:13px; color:var(--primary); margin-bottom:2px;
+}
+.chunk .time { font-size:11px; color:var(--text-light); float:right; }
+.chunk .text { font-size:14px; line-height:1.7; }
+
+/* ── Toast notification ── */
+.toast-container { position:fixed; top:20px; right:20px; z-index:1000; }
+.toast {
+  background:var(--card); border-radius:var(--radius); padding:16px 20px;
+  box-shadow:var(--shadow-lg); margin-bottom:12px; max-width:380px;
+  border-left:4px solid var(--accent); animation:slideIn .3s ease;
+  cursor:pointer;
+}
+.toast.news { border-left-color:var(--danger); }
+.toast .toast-badge { font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase; }
+.toast.news .toast-badge { color:var(--danger); }
+.toast .toast-title { font-weight:600; font-size:14px; margin:4px 0; }
+.toast .toast-text { font-size:13px; color:var(--text-light); }
+@keyframes slideIn { from{transform:translateX(100%);opacity:0} to{transform:none;opacity:1} }
+
+/* ── Responsive ── */
+@media (max-width:768px) {
+  .sidebar { display:none; }
+  .main { margin-left:0; padding:16px; }
+  .stats-grid { grid-template-columns:repeat(2,1fr); }
+}
+
+.hidden { display:none !important; }
+.page { display:none; }
+.page.active { display:block; }
+.role-select { display:flex; gap:12px; margin-bottom:16px; }
+.role-btn {
+  flex:1; padding:16px; border:2px solid var(--border); border-radius:8px;
+  text-align:center; cursor:pointer; transition:.2s;
+}
+.role-btn:hover { border-color:var(--primary-light); }
+.role-btn.selected { border-color:var(--primary); background:rgba(26,54,93,.06); }
+.role-btn .role-icon { font-size:24px; margin-bottom:8px; }
+.role-btn .role-name { font-weight:600; font-size:14px; }
+.role-btn .role-desc { font-size:11px; color:var(--text-light); margin-top:4px; }
+</style>
+</head>
+<body>
+
+<!-- ============ AUTH ============ -->
+<div id="auth-page" class="page active">
+  <div class="auth-container">
+    <h1>RANST</h1>
+    <div class="subtitle">Raadsinformatie Analyse & Notificatie Systeem</div>
+
+    <div class="tabs">
+      <button class="active" onclick="showAuthTab('login')">Inloggen</button>
+      <button onclick="showAuthTab('register')">Registreren</button>
+    </div>
+
+    <form id="login-form" onsubmit="return doLogin(event)">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="login-email" required placeholder="naam@organisatie.nl">
+      </div>
+      <div class="form-group">
+        <label>Wachtwoord</label>
+        <input type="password" id="login-password" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Inloggen</button>
+    </form>
+
+    <form id="register-form" class="hidden" onsubmit="return doRegister(event)">
+      <div class="form-group">
+        <label>Naam</label>
+        <input type="text" id="reg-name" placeholder="Uw naam">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="reg-email" required placeholder="naam@organisatie.nl">
+      </div>
+      <div class="form-group">
+        <label>Wachtwoord</label>
+        <input type="password" id="reg-password" required minlength="4">
+      </div>
+      <div class="form-group">
+        <label>Ik ontvang meldingen als</label>
+        <div class="role-select">
+          <div class="role-btn selected" onclick="selectRole('ps')" data-role="ps">
+            <div class="role-icon">🏛️</div>
+            <div class="role-name">Provinciale Staten</div>
+            <div class="role-desc">Sector-meldingen per onderwerp</div>
+          </div>
+          <div class="role-btn" onclick="selectRole('anp')" data-role="anp">
+            <div class="role-icon">📰</div>
+            <div class="role-name">ANP / Pers</div>
+            <div class="role-desc">Nieuwswaardige meldingen</div>
+          </div>
+        </div>
+        <input type="hidden" id="reg-role" value="ps">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Account aanmaken</button>
+    </form>
+
+    <div id="auth-error" style="color:var(--danger);font-size:13px;margin-top:12px;"></div>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app-shell" class="app hidden">
+  <aside class="sidebar">
+    <h1>RANST</h1>
+    <div class="subtitle">Raadsinformatie Analyse</div>
+    <nav>
+      <a href="#dashboard" class="active" onclick="navigate('dashboard')">
+        <span class="icon">📊</span> Dashboard
+      </a>
+      <a href="#meetings" onclick="navigate('meetings')">
+        <span class="icon">📋</span> Vergaderingen
+      </a>
+      <a href="#alerts" onclick="navigate('alerts')">
+        <span class="icon">🔔</span> Meldingen <span id="alert-count" class="badge badge-live hidden">0</span>
+      </a>
+      <a href="#transcript" onclick="navigate('transcript')">
+        <span class="icon">📝</span> Transcript
+      </a>
+      <a href="#preferences" onclick="navigate('preferences')">
+        <span class="icon">⚙️</span> Voorkeuren
+      </a>
+    </nav>
+    <div class="user-info">
+      <div id="user-name"></div>
+      <div class="email" id="user-email"></div>
+      <button class="btn btn-outline btn-sm" style="margin-top:10px;color:#cbd5e0;border-color:rgba(255,255,255,.2);" onclick="doLogout()">Uitloggen</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- Dashboard -->
+    <div id="page-dashboard" class="page active">
+      <h2 style="margin-bottom:24px;">Dashboard</h2>
+      <div class="stats-grid" id="stats-grid"></div>
+
+      <div style="display:flex;gap:16px;margin-bottom:24px;">
+        <button class="btn btn-accent" onclick="startDemo()">▶ Start Demo Vergadering</button>
+      </div>
+
+      <div class="card">
+        <h2>Live vergaderingen</h2>
+        <div id="live-meetings">
+          <p style="color:var(--text-light)">Laden...</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Recente meldingen</h2>
+        <div id="recent-alerts">
+          <p style="color:var(--text-light)">Geen meldingen nog</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Meetings -->
+    <div id="page-meetings" class="page">
+      <h2 style="margin-bottom:24px;">Vergaderingen vandaag</h2>
+      <div class="card">
+        <div id="today-meetings">Laden...</div>
+      </div>
+      <h2 style="margin:24px 0;">Komende week</h2>
+      <div class="card">
+        <div id="upcoming-meetings">Laden...</div>
+      </div>
+    </div>
+
+    <!-- Alerts -->
+    <div id="page-alerts" class="page">
+      <h2 style="margin-bottom:24px;">Meldingen</h2>
+      <div id="alerts-list">Laden...</div>
+    </div>
+
+    <!-- Transcript -->
+    <div id="page-transcript" class="page">
+      <div class="card">
+        <div class="transcript-header">
+          <div>
+            <h2 id="transcript-title">Transcript</h2>
+            <div id="transcript-subtitle" style="color:var(--text-light);font-size:13px;"></div>
+          </div>
+          <a id="transcript-stream-link" href="#" target="_blank" class="btn btn-accent btn-sm hidden">
+            Bekijk livestream
+          </a>
+        </div>
+        <div id="transcript-chunks" class="transcript-chunks">
+          <p style="color:var(--text-light)">Start een demo-vergadering om een transcript te zien.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Preferences -->
+    <div id="page-preferences" class="page">
+      <h2 style="margin-bottom:24px;">Voorkeuren</h2>
+
+      <div class="card">
+        <h3>Onderwerpen</h3>
+        <p style="color:var(--text-light);font-size:13px;margin-bottom:16px;">
+          Selecteer de onderwerpen waarover u meldingen wilt ontvangen.
+        </p>
+        <div class="topic-grid" id="topics-grid"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h3>Gemeenten</h3>
+        <p style="color:var(--text-light);font-size:13px;margin-bottom:16px;">
+          Selecteer de gemeenten die u wilt volgen. Laat leeg voor alle gemeenten.
+        </p>
+        <div class="gemeente-search">
+          <input type="text" id="gemeente-input" placeholder="Zoek gemeente..."
+                 oninput="filterGemeenten()" onfocus="showGemeenteDropdown()">
+          <div class="gemeente-dropdown" id="gemeente-dropdown"></div>
+        </div>
+        <div class="gemeente-tags" id="gemeente-tags"></div>
+      </div>
+
+      <button class="btn btn-primary" style="margin-top:16px;" onclick="savePreferences()">
+        Voorkeuren opslaan
+      </button>
+    </div>
+  </main>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ── State ──
+let token = localStorage.getItem('ranst_token');
+let user = null;
+let prefs = { topics: [], gemeenten: [] };
+let allTopics = {};
+let allGemeenten = [];
+let currentMeetingId = null;
+let transcriptPollInterval = null;
+let eventSource = null;
+let lastTranscriptTime = 0;
+
+const API = '';
+
+// ── API helper ──
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const res = await fetch(API + path, { ...opts, headers });
+  if (res.status === 401) { doLogout(); throw new Error('Unauthorized'); }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'API error');
+  }
+  return res.json();
+}
+
+// ── Auth ──
+function showAuthTab(tab) {
+  document.querySelectorAll('.auth-container .tabs button').forEach(b => b.classList.remove('active'));
+  if (tab === 'login') {
+    document.querySelector('.tabs button:first-child').classList.add('active');
+    document.getElementById('login-form').classList.remove('hidden');
+    document.getElementById('register-form').classList.add('hidden');
+  } else {
+    document.querySelector('.tabs button:last-child').classList.add('active');
+    document.getElementById('login-form').classList.add('hidden');
+    document.getElementById('register-form').classList.remove('hidden');
+  }
+}
+
+function selectRole(role) {
+  document.getElementById('reg-role').value = role;
+  document.querySelectorAll('.role-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.role === role);
+  });
+}
+
+async function doLogin(e) {
+  e.preventDefault();
+  try {
+    const data = await api('/api/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: document.getElementById('login-email').value,
+        password: document.getElementById('login-password').value,
+      }),
+    });
+    token = data.token;
+    user = data.user;
+    localStorage.setItem('ranst_token', token);
+    enterApp();
+  } catch (err) {
+    document.getElementById('auth-error').textContent = err.message;
+  }
+  return false;
+}
+
+async function doRegister(e) {
+  e.preventDefault();
+  try {
+    const data = await api('/api/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: document.getElementById('reg-name').value,
+        email: document.getElementById('reg-email').value,
+        password: document.getElementById('reg-password').value,
+        role: document.getElementById('reg-role').value,
+      }),
+    });
+    token = data.token;
+    user = data.user;
+    localStorage.setItem('ranst_token', token);
+    enterApp();
+  } catch (err) {
+    document.getElementById('auth-error').textContent = err.message;
+  }
+  return false;
+}
+
+function doLogout() {
+  api('/api/logout', { method: 'POST' }).catch(() => {});
+  token = null; user = null;
+  localStorage.removeItem('ranst_token');
+  if (eventSource) { eventSource.close(); eventSource = null; }
+  document.getElementById('auth-page').classList.add('active');
+  document.getElementById('app-shell').classList.add('hidden');
+}
+
+// ── App init ──
+async function enterApp() {
+  document.getElementById('auth-page').classList.remove('active');
+  document.getElementById('app-shell').classList.remove('hidden');
+
+  try {
+    user = await api('/api/me');
+  } catch { doLogout(); return; }
+
+  document.getElementById('user-name').textContent = user.name || user.email;
+  document.getElementById('user-email').textContent = user.email;
+
+  allTopics = await api('/api/topics');
+  allGemeenten = await api('/api/gemeenten');
+  prefs = await api('/api/preferences');
+
+  renderTopics();
+  renderGemeentenTags();
+  loadDashboard();
+  connectSSE();
+  navigate('dashboard');
+}
+
+// ── Navigation ──
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelectorAll('.sidebar nav a').forEach(a => a.classList.remove('active'));
+  document.querySelector(`[href="#${page}"]`)?.classList.add('active');
+
+  if (page === 'dashboard') loadDashboard();
+  if (page === 'meetings') loadMeetings();
+  if (page === 'alerts') loadAlerts();
+  if (page === 'transcript') loadTranscript();
+}
+
+// ── Dashboard ──
+async function loadDashboard() {
+  try {
+    const stats = await api('/api/stats');
+    document.getElementById('stats-grid').innerHTML = `
+      <div class="stat-card"><div class="number">${stats.live}</div><div class="label">Live nu</div></div>
+      <div class="stat-card"><div class="number">${stats.today}</div><div class="label">Vandaag</div></div>
+      <div class="stat-card"><div class="number">${stats.scheduled}</div><div class="label">Gepland</div></div>
+      <div class="stat-card"><div class="number">${stats.gemeenten}</div><div class="label">Gemeenten</div></div>
+      <div class="stat-card"><div class="number">${stats.alerts}</div><div class="label">Meldingen</div></div>
+      <div class="stat-card"><div class="number">${stats.users}</div><div class="label">Gebruikers</div></div>
+    `;
+
+    const live = await api('/api/meetings/live');
+    document.getElementById('live-meetings').innerHTML = live.length
+      ? live.map(renderMeeting).join('')
+      : '<p style="color:var(--text-light)">Geen live vergaderingen op dit moment</p>';
+
+    const alerts = await api('/api/alerts?limit=5');
+    document.getElementById('recent-alerts').innerHTML = alerts.length
+      ? alerts.map(renderAlert).join('')
+      : '<p style="color:var(--text-light)">Geen meldingen nog</p>';
+  } catch (err) { console.error(err); }
+}
+
+// ── Meetings ──
+async function loadMeetings() {
+  try {
+    const today = await api('/api/meetings/today');
+    document.getElementById('today-meetings').innerHTML = today.length
+      ? today.map(renderMeeting).join('')
+      : '<p style="color:var(--text-light)">Geen vergaderingen vandaag</p>';
+
+    const upcoming = await api('/api/meetings/upcoming');
+    let currentDate = '';
+    let html = '';
+    for (const m of upcoming) {
+      if (m.datum !== currentDate) {
+        currentDate = m.datum;
+        const d = new Date(m.datum);
+        const dag = ['zo','ma','di','wo','do','vr','za'][d.getDay()];
+        html += `<h3 style="margin:20px 0 10px;color:var(--text-light);font-size:13px;">${dag} ${m.datum}</h3>`;
+      }
+      html += renderMeeting(m);
+    }
+    document.getElementById('upcoming-meetings').innerHTML = html || '<p style="color:var(--text-light)">Geen geplande vergaderingen</p>';
+  } catch (err) { console.error(err); }
+}
+
+function renderMeeting(m) {
+  const statusBadge = m.status === 'live'
+    ? '<span class="badge badge-live">LIVE</span>'
+    : m.has_livestream
+      ? '<span class="badge badge-stream">STREAM</span>'
+      : '<span class="badge badge-scheduled">GEPLAND</span>';
+  return `
+    <div class="meeting-item" onclick="openTranscript(${m.id}, '${escHtml(m.gemeente)}', '${escHtml(m.url || '')}')">
+      <div class="meeting-time">${m.tijd || '??:??'}</div>
+      <div class="meeting-info">
+        <div class="gemeente">${escHtml(m.gemeente)} ${statusBadge}</div>
+        <div class="titel">${escHtml(m.titel || '')}</div>
+        ${m.url ? `<div class="url"><a href="${escHtml(m.url)}" target="_blank" onclick="event.stopPropagation()">Bekijk live</a></div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+// ── Alerts ──
+async function loadAlerts() {
+  try {
+    const alerts = await api('/api/alerts?limit=100');
+    document.getElementById('alerts-list').innerHTML = alerts.length
+      ? alerts.map(renderAlert).join('')
+      : '<p style="color:var(--text-light)">Geen meldingen. Stel uw voorkeuren in en start een demo-vergadering.</p>';
+  } catch (err) { console.error(err); }
+}
+
+function renderAlert(a) {
+  const isUnread = !a.read;
+  const isNews = a.type === 'anp';
+  const topicLabel = allTopics[a.topic] || a.topic || 'Nieuws';
+  return `
+    <div class="alert-item ${isUnread ? 'unread' : ''}" onclick="clickAlert(${a.id}, ${a.meeting_id})">
+      <div style="flex:1">
+        <div class="alert-badge">${isNews ? '📰 ANP' : '🏛️ ' + topicLabel}</div>
+        <div class="alert-title">${escHtml(a.title || '')}</div>
+        <div class="alert-summary">${escHtml(a.summary || '')}</div>
+        <div class="alert-time">${a.created_at || ''}</div>
+      </div>
+    </div>
+  `;
+}
+
+async function clickAlert(alertId, meetingId) {
+  try {
+    await api(`/api/alerts/${alertId}/read`, { method: 'POST' });
+  } catch {}
+  if (meetingId) openTranscript(meetingId);
+  else navigate('alerts');
+}
+
+// ── Transcript ──
+function openTranscript(meetingId, gemeente, url) {
+  currentMeetingId = meetingId;
+  lastTranscriptTime = 0;
+  document.getElementById('transcript-title').textContent = gemeente || 'Transcript';
+  document.getElementById('transcript-subtitle').textContent = 'Meeting #' + meetingId;
+  if (url) {
+    const link = document.getElementById('transcript-stream-link');
+    link.href = url;
+    link.classList.remove('hidden');
+  }
+  navigate('transcript');
+  loadTranscript();
+}
+
+async function loadTranscript() {
+  if (!currentMeetingId) return;
+  try {
+    const chunks = await api(`/api/transcript/${currentMeetingId}?since=${lastTranscriptTime}`);
+    const container = document.getElementById('transcript-chunks');
+    if (chunks.length > 0 && lastTranscriptTime === 0) container.innerHTML = '';
+
+    for (const c of chunks) {
+      const div = document.createElement('div');
+      div.className = 'chunk';
+      div.innerHTML = `
+        <span class="time">${formatTime(c.start_time)}</span>
+        <div class="speaker">${escHtml(c.speaker || 'Spreker')}</div>
+        <div class="text">${escHtml(c.text)}</div>
+      `;
+      container.appendChild(div);
+      if (c.end_time > lastTranscriptTime) lastTranscriptTime = c.end_time;
+    }
+    if (chunks.length > 0) container.scrollTop = container.scrollHeight;
+  } catch (err) { console.error(err); }
+}
+
+function formatTime(seconds) {
+  if (!seconds && seconds !== 0) return '';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+// ── Preferences ──
+function renderTopics() {
+  const grid = document.getElementById('topics-grid');
+  grid.innerHTML = Object.entries(allTopics).map(([id, name]) => {
+    const sel = prefs.topics.includes(id) ? 'selected' : '';
+    return `
+      <label class="topic-chip ${sel}" onclick="toggleTopic(this, '${id}')">
+        <div class="check">${sel ? '✓' : ''}</div>
+        <span>${name}</span>
+      </label>
+    `;
+  }).join('');
+}
+
+function toggleTopic(el, topicId) {
+  const idx = prefs.topics.indexOf(topicId);
+  if (idx >= 0) prefs.topics.splice(idx, 1);
+  else prefs.topics.push(topicId);
+  el.classList.toggle('selected');
+  el.querySelector('.check').textContent = el.classList.contains('selected') ? '✓' : '';
+}
+
+function renderGemeentenTags() {
+  document.getElementById('gemeente-tags').innerHTML = prefs.gemeenten.map(g =>
+    `<span class="gemeente-tag">${escHtml(g)} <span class="remove" onclick="removeGemeente('${escHtml(g)}')">&times;</span></span>`
+  ).join('');
+}
+
+function filterGemeenten() {
+  const q = document.getElementById('gemeente-input').value.toLowerCase();
+  const dd = document.getElementById('gemeente-dropdown');
+  if (q.length < 1) { dd.classList.remove('open'); return; }
+  const matches = allGemeenten.filter(g =>
+    g.toLowerCase().includes(q) && !prefs.gemeenten.includes(g)
+  ).slice(0, 10);
+  dd.innerHTML = matches.map(g =>
+    `<div onclick="addGemeente('${escHtml(g)}')">${escHtml(g)}</div>`
+  ).join('');
+  dd.classList.toggle('open', matches.length > 0);
+}
+
+function showGemeenteDropdown() { filterGemeenten(); }
+
+function addGemeente(name) {
+  if (!prefs.gemeenten.includes(name)) prefs.gemeenten.push(name);
+  document.getElementById('gemeente-input').value = '';
+  document.getElementById('gemeente-dropdown').classList.remove('open');
+  renderGemeentenTags();
+}
+
+function removeGemeente(name) {
+  prefs.gemeenten = prefs.gemeenten.filter(g => g !== name);
+  renderGemeentenTags();
+}
+
+async function savePreferences() {
+  try {
+    await api('/api/preferences', {
+      method: 'PUT',
+      body: JSON.stringify({ topics: prefs.topics, gemeenten: prefs.gemeenten }),
+    });
+    showToast('Voorkeuren opgeslagen', 'Uw meldingen worden nu gefilterd op uw selectie.', 'sector');
+  } catch (err) {
+    showToast('Fout', err.message, 'news');
+  }
+}
+
+// ── Demo ──
+async function startDemo() {
+  try {
+    const res = await api('/api/demo/start', { method: 'POST' });
+    currentMeetingId = res.meeting_id;
+    lastTranscriptTime = 0;
+    showToast('Demo gestart', `Vergadering ${res.gemeente} — transcript verschijnt live`, 'sector');
+
+    document.getElementById('transcript-title').textContent = res.gemeente;
+    document.getElementById('transcript-subtitle').textContent = 'Demo vergadering';
+    document.getElementById('transcript-chunks').innerHTML = '';
+    navigate('transcript');
+
+    // Poll transcript elke 2 seconden
+    if (transcriptPollInterval) clearInterval(transcriptPollInterval);
+    transcriptPollInterval = setInterval(loadTranscript, 2000);
+  } catch (err) {
+    showToast('Fout', err.message, 'news');
+  }
+}
+
+// ── SSE ──
+function connectSSE() {
+  if (eventSource) eventSource.close();
+  if (!token) return;
+
+  eventSource = new EventSource('/api/alerts/stream?token=' + encodeURIComponent(token));
+
+  eventSource.onmessage = function(e) {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.type_event === 'alert') {
+        showToast(data.title || 'Melding', data.summary || data.quote || '', data.type === 'anp' ? 'news' : 'sector');
+        loadAlerts();
+        loadDashboard();
+      }
+    } catch {}
+  };
+
+  eventSource.onerror = function() {
+    // Fallback: poll for alerts
+    eventSource.close();
+    eventSource = null;
+  };
+
+  // Also poll as backup
+  setInterval(async () => {
+    try {
+      const alerts = await api('/api/alerts?unread=true&limit=5');
+      const countEl = document.getElementById('alert-count');
+      if (alerts.length > 0) {
+        countEl.textContent = alerts.length;
+        countEl.classList.remove('hidden');
+      } else {
+        countEl.classList.add('hidden');
+      }
+    } catch {}
+  }, 5000);
+}
+
+// ── Toast ──
+function showToast(title, text, type) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'toast' + (type === 'news' ? ' news' : '');
+  toast.innerHTML = `
+    <div class="toast-badge">${type === 'news' ? '📰 ANP' : '🏛️ Melding'}</div>
+    <div class="toast-title">${escHtml(title)}</div>
+    <div class="toast-text">${escHtml(text)}</div>
+  `;
+  toast.onclick = () => {
+    navigate('alerts');
+    toast.remove();
+  };
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 8000);
+
+  // Browser notification
+  if (Notification.permission === 'granted') {
+    new Notification(title, { body: text, icon: '/static/icon-192.png' });
+  }
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Init ──
+document.addEventListener('DOMContentLoaded', async () => {
+  // Request notification permission
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+
+  // Register service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+
+  // Close gemeente dropdown on outside click
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.gemeente-search')) {
+      document.getElementById('gemeente-dropdown')?.classList.remove('open');
+    }
+  });
+
+  // Auto-login if token exists
+  if (token) {
+    try {
+      await enterApp();
+    } catch {
+      doLogout();
+    }
+  }
+});
+</script>
+</body>
+</html>
