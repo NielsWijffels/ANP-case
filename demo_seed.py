@@ -343,6 +343,14 @@ def seed(clear=False):
     inserted = 0
 
     for art in DEMO_ARTIKELEN:
+        # Sla over als artikel met zelfde titel al bestaat
+        existing = conn.execute(
+            "SELECT id FROM articles WHERE title = ?", (art['title'],)
+        ).fetchone()
+        if existing:
+            print(f"  – [{art['level']:12}] {art['gemeente']}: al aanwezig, overgeslagen")
+            continue
+
         ts = (now - timedelta(minutes=art['minutes_ago'])).isoformat(timespec='seconds')
         conn.execute("""
             INSERT INTO articles (gemeente, topic, level, title, body, score, indicators, created_at)
