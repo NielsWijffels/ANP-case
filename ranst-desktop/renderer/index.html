@@ -1869,12 +1869,12 @@ async function loadSidebar() {
     const nowMin = nh * 60 + nm
     function isPastMeeting(m) {
       if (m.isLive) return false
-      if (m.status === 'afgelopen' || m.status === 'missed') return true
+      if (m.status === 'afgelopen' || m.status === 'missed' || m.status === 'ended') return true
       const tStr = (m.tijd||'00:00').slice(0,5)
       const [th, tm2] = tStr.split(':').map(Number)
       const startMin = th * 60 + tm2
-      // Beide: 2 uur grace period — vergadering zonder stream duurt ook gewoon even
-      return nowMin > startMin + 120
+      // Zodra de starttijd voorbij is en de vergadering niet live is → afgelopen
+      return nowMin > startMin
     }
     const past = todayMts.filter(m => isPastMeeting(m))
     const liveNow = live
@@ -1891,7 +1891,7 @@ async function loadSidebar() {
 
     // Past meetings — geordend op tijd, oudste eerst
     if (past.length) {
-      html += `<div class="sb-section-label">Eerder vandaag</div>`
+      html += `<div class="sb-section-label sb-ended-label">Afgelopen vandaag</div>`
       html += [...past].sort((a,b) => (a.tijd||'').localeCompare(b.tijd||'')).map(m => sbItem(m, true, false)).join('')
     }
 
