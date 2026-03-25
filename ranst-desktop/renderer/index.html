@@ -316,11 +316,12 @@ body.slim-mode .art-footer{margin-top:7px;}
 .cal-view-btn.active{background:var(--primary);color:#fff;}
 /* ── Week view ── */
 .cal-week-grid{
-  display:grid;grid-template-columns:repeat(7,1fr);gap:3px;
+  display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;
   background:var(--border);border-radius:var(--r2);overflow:hidden;
   max-height:520px;overflow-y:auto;
+  width:100%;
 }
-.wk-day{background:var(--card);min-height:160px;display:flex;flex-direction:column;}
+.wk-day{background:var(--card);min-height:160px;display:flex;flex-direction:column;min-width:0;overflow:hidden;}
 .wk-day.wk-today{background:#eff6ff;}
 .wk-day-head{
   display:flex;align-items:center;gap:6px;padding:8px 10px 6px;
@@ -1225,12 +1226,12 @@ body.slim-mode .art-footer{margin-top:7px;}
           <button class="cal-nav-btn" id="cal-next">›</button>
           <button class="cal-today-btn" id="cal-today-btn">Vandaag</button>
           <div class="cal-view-toggle">
-            <button class="cal-view-btn active" id="cal-view-month">Maand</button>
-            <button class="cal-view-btn" id="cal-view-week">Week</button>
+            <button class="cal-view-btn" id="cal-view-month">Maand</button>
+            <button class="cal-view-btn active" id="cal-view-week">Week</button>
           </div>
         </div>
       </div>
-      <div class="cal-grid-head" id="cal-day-names">
+      <div class="cal-grid-head" id="cal-day-names" style="display:none">
         <div class="cal-day-name">Ma</div>
         <div class="cal-day-name">Di</div>
         <div class="cal-day-name">Wo</div>
@@ -1239,8 +1240,8 @@ body.slim-mode .art-footer{margin-top:7px;}
         <div class="cal-day-name">Za</div>
         <div class="cal-day-name">Zo</div>
       </div>
-      <div class="cal-grid" id="cal-grid"></div>
-      <div class="cal-week-grid" id="cal-week-grid" style="display:none"></div>
+      <div class="cal-grid" id="cal-grid" style="display:none"></div>
+      <div class="cal-week-grid" id="cal-week-grid"></div>
       <!-- Day detail -->
       <div id="cal-detail">
         <div class="cd-head">
@@ -1873,8 +1874,10 @@ async function loadSidebar() {
       const tStr = (m.tijd||'00:00').slice(0,5)
       const [th, tm2] = tStr.split(':').map(Number)
       const startMin = th * 60 + tm2
-      // Zodra de starttijd voorbij is en de vergadering niet live is → afgelopen
-      return nowMin > startMin
+      // Nog niet begonnen → niet als afgelopen markeren, blijft onder "Vandaag"
+      if (nowMin < startMin) return false
+      // Starttijd is voorbij en niet live → afgelopen
+      return true
     }
     const past = todayMts.filter(m => isPastMeeting(m))
     const liveNow = live
@@ -2136,7 +2139,7 @@ function sbItem(m, isPast, isLive, showDate = false) {
 }
 
 // ── Kalender (maandoverzicht + weekoverzicht) ─────────────────────────────
-var calView = 'week'   // 'month' | 'week'
+var calView = 'week'    // 'month' | 'week' — standaard altijd weekweergave
 var calWeekStart = null // Monday YYYY-MM-DD of current week view
 
 function initCalendar() {
@@ -2164,9 +2167,9 @@ function _setCalView(v) {
   const eUp    = document.querySelector('.upcoming-section')
   if (eMonth) eMonth.classList.toggle('active', v === 'month')
   if (eWeek)  eWeek.classList.toggle('active', v === 'week')
-  if (eDays)  eDays.style.display  = v === 'month' ? '' : 'none'
-  if (eGrid)  eGrid.style.display  = v === 'month' ? '' : 'none'
-  if (eWGrid) eWGrid.style.display = v === 'week' ? 'grid' : 'none'
+  if (eDays)  eDays.style.display  = v === 'month' ? 'grid' : 'none'
+  if (eGrid)  eGrid.style.display  = v === 'month' ? 'grid' : 'none'
+  if (eWGrid) eWGrid.style.display = v === 'week'  ? 'grid' : 'none'
 }
 
 async function renderCalendarView() {
