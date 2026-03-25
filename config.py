@@ -14,7 +14,7 @@ HF_TOKEN = os.getenv('HF_TOKEN')
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'mistral')
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
 NEWS_SCORE_THRESHOLD = float(os.getenv('NEWS_SCORE_THRESHOLD', 0.65))
-
+ v 
 YOUTUBE_CHANNEL = '@gemeenteranst1107'
 
 # Use Colab directories if in Colab

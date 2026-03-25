@@ -278,6 +278,13 @@ body.slim-mode .art-footer{margin-top:7px;}
 .art-expand{font-size:12px;color:var(--primary);font-weight:600;padding:0;}
 .art-stream{font-size:12px;color:var(--best);font-weight:600;padding:0;display:flex;align-items:center;gap:4px;}
 .art-meeting{font-size:12px;color:var(--primary);font-weight:600;padding:0;}
+.art-bron-toggle{font-size:11px;color:var(--text-3);cursor:pointer;padding:4px 0 0;user-select:none;}
+.art-bron-toggle:hover{color:var(--primary);}
+.art-bron-body{margin:6px 0 2px;border-left:2px solid var(--border);padding-left:10px;display:flex;flex-direction:column;gap:4px;}
+.art-bron-chunk{display:flex;flex-direction:column;gap:1px;font-size:11.5px;padding:3px 0;}
+.art-bron-time{font-size:10px;color:var(--text-3);font-variant-numeric:tabular-nums;}
+.art-bron-speaker{font-weight:600;color:var(--text-2);font-size:11px;}
+.art-bron-text{color:var(--text-2);line-height:1.5;}
 .feed-empty{text-align:center;padding:80px 20px;color:var(--text-3);}
 .feed-empty .icon{font-size:48px;margin-bottom:16px;}
 .feed-empty p{font-size:14px;line-height:1.6;}
@@ -1215,6 +1222,7 @@ body.slim-mode .art-footer{margin-top:7px;}
         <div class="feed-filters">
           <button class="chip active" data-f="alle">Alle</button>
           <button class="chip pers" data-f="pers">Pers</button>
+          <button class="chip best" data-f="bestuurlijk">Bestuurlijk</button>
         </div>
       </div>
       <div id="feed-list">
@@ -1657,8 +1665,8 @@ function renderFeed() {
   let list = articles
     .filter(articleMatches)
     .filter(a => a.body && !a.body.startsWith('NIET_RELEVANT'))
-    .filter(a => a.level !== 'bestuurlijk')  // bestuurlijk = vergaderanalyse, hoort in vergaderingsdetail
   if (feedFilter === 'pers') list = list.filter(a => a.level === 'pers')
+  if (feedFilter === 'bestuurlijk') list = list.filter(a => a.level === 'bestuurlijk')
   const groups = _groupAndMerge(list)
   const el = document.getElementById('feed-list')
   const sub = document.getElementById('feed-sub')
@@ -1725,11 +1733,16 @@ function articleMergedHTML(group) {
 
 function bindArticleEvents(container) {
   container.querySelectorAll('.art-expand').forEach(btn => {
+    const art = btn.closest('article')
+    const clampedBodies = art.querySelectorAll('.art-body.clamp')
+    // Verberg knop als geen van de bodies daadwerkelijk afgekapt is
+    const isClamped = Array.from(clampedBodies).some(b => b.scrollHeight > b.clientHeight + 2)
+    if (!isClamped) { btn.style.display = 'none'; return }
+
     btn.addEventListener('click', () => {
-      const art = btn.closest('article')
-      const bodies = art.querySelectorAll('.art-body')
-      const open = !bodies[0].classList.contains('clamp')
-      bodies.forEach(b => b.classList.toggle('clamp', open))
+      const allBodies = art.querySelectorAll('.art-body')
+      const open = !allBodies[0].classList.contains('clamp')
+      allBodies.forEach(b => b.classList.toggle('clamp', open))
       btn.textContent = open ? 'Meer lezen ↓' : 'Minder ↑'
     })
   })
@@ -1745,14 +1758,47 @@ function bindArticleEvents(container) {
       openMeeting(+btn.dataset.meeting, 'feed')
     })
   })
+  container.querySelectorAll('.art-bron-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = document.getElementById(btn.dataset.target)
+      if (!target) return
+      const open = target.classList.toggle('hidden')
+      btn.textContent = btn.textContent.replace(open ? ' ↑' : ' ↓', open ? ' ↓' : ' ↑')
+    })
+  })
 }
 
 // ── Meeting detail — artikel helpers ──────────────────────────────────────
-function mdArticleHTML(a) {
+function mdArticleHTML(a, transcriptChunks) {
   const icons = _topicIconsStr({ topicIds: new Set(_getTopicIds(a)) })
   const meetingBtn = a.meeting_id
     ? `<button class="art-meeting" data-meeting="${a.meeting_id}">Vergadering →</button>`
     : ''
+
+  // Brontranscript: toon relevante chunks als t_start/t_end beschikbaar zijn
+  let bronHtml = ''
+  if (transcriptChunks && transcriptChunks.length && a.t_start != null && a.t_end != null) {
+    const margin = 15  // seconden buffer rondom het window
+    const bronChunks = transcriptChunks.filter(c =>
+      c.start_time != null &&
+      c.start_time >= (a.t_start - margin) &&
+      c.start_time <= (a.t_end + margin)
+    )
+    if (bronChunks.length) {
+      const uid = `bron-${a.id}`
+      bronHtml = `
+        <div class="art-bron-toggle" data-target="${uid}">📄 Brontranscript (${bronChunks.length} fragmenten) ↓</div>
+        <div class="art-bron-body hidden" id="${uid}">
+          ${bronChunks.map(c => `
+            <div class="art-bron-chunk">
+              <span class="art-bron-time">${fmtSecs(c.start_time)}</span>
+              <span class="art-bron-speaker">${esc(c.speaker||'Spreker')}</span>
+              <span class="art-bron-text">${esc(c.text||'')}</span>
+            </div>`).join('')}
+        </div>`
+    }
+  }
+
   return `<article class="article pers" data-id="${a.id}">
     <div class="art-meta">
       ${icons ? `<span class="art-icons">${icons}</span>` : ''}
@@ -1761,6 +1807,7 @@ function mdArticleHTML(a) {
     </div>
     <div class="art-title">${esc(a.title||'')}</div>
     <div class="art-body clamp">${md(a.body||'')}</div>
+    ${bronHtml}
     <div class="art-footer">
       <button class="art-expand">Meer lezen ↓</button>
       ${meetingBtn}
@@ -1859,11 +1906,14 @@ async function loadSidebar() {
   const empty = document.getElementById('sb-empty')
   try {
     const params = (P.gemeenten.length && P.gemeenten.length <= 50) ? { gemeenten: P.gemeenten.join(',') } : {}
-    const [todayMts, upcoming, live] = await Promise.all([
+    const [r0, r1, r2] = await Promise.allSettled([
       api('/api/meetings/today', params),
       api('/api/meetings/upcoming', { ...params, limit: 30 }),
       api('/api/meetings/live'),
     ])
+    const todayMts = r0.status === 'fulfilled' ? r0.value : []
+    const upcoming  = r1.status === 'fulfilled' ? r1.value : []
+    const live      = r2.status === 'fulfilled' ? r2.value : []
 
     // Merge live status
     const liveIds = new Set(live.map(m => m.id))
@@ -1878,11 +1928,11 @@ async function loadSidebar() {
     const nowMin = nh * 60 + nm
     function isPastMeeting(m) {
       if (m.isLive) return false
-      if (m.status === 'afgelopen' || m.status === 'missed' || m.status === 'ended') return true
-      const tStr = (m.tijd||'00:00').slice(0,5)
+      const tStr = (m.tijd||'').slice(0,5)
+      if (!tStr) return false  // geen tijd → behandel als toekomstig
       const [th, tm2] = tStr.split(':').map(Number)
       const startMin = th * 60 + tm2
-      // Nog niet begonnen → niet als afgelopen markeren, blijft onder "Vandaag"
+      // Starttijd nog niet bereikt → toekomstig
       if (nowMin < startMin) return false
       // Starttijd is voorbij en niet live → afgelopen
       return true
@@ -2476,7 +2526,7 @@ async function openMeeting(id, from) {
     // Pers-artikelen voor de nieuwsfeed-sectie
     const persArts = arts.filter(a => a.level === 'pers' && a.body && !a.body.startsWith('NIET_RELEVANT'))
     const persArtsHtml = persArts.length
-      ? persArts.map(a => mdArticleHTML(a)).join('')
+      ? persArts.map(a => mdArticleHTML(a, transcript)).join('')
       : '<div class="md-empty">Geen persartikelen beschikbaar.</div>'
     // Bestuurlijk = vergaderanalyse, los getoond als samenvatting
     const analArts = arts.filter(a => a.level === 'bestuurlijk' && a.body && !a.body.startsWith('NIET_RELEVANT'))

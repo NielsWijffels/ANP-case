@@ -8,994 +8,1227 @@
 <link rel="manifest" href="/manifest.json">
 <style>
 :root {
-  --bg: #f7f8fc;
+  --bg: #f0f2f7;
   --card: #ffffff;
   --primary: #1a365d;
   --primary-light: #2c5282;
   --accent: #e67e22;
-  --accent-light: #f39c12;
-  --text: #2d3748;
+  --pers: #c0392b;
+  --pers-bg: #fde8e8;
+  --bestuurlijk: #1a6b3c;
+  --bestuurlijk-bg: #e6f4ec;
+  --text: #1a202c;
   --text-light: #718096;
   --border: #e2e8f0;
-  --success: #38a169;
-  --danger: #e53e3e;
-  --radius: 12px;
-  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
-  --shadow-lg: 0 4px 14px rgba(0,0,0,0.1);
+  --live: #e53e3e;
+  --radius: 10px;
+  --shadow: 0 1px 3px rgba(0,0,0,.08);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.12);
+  --topbar: 52px;
+  --sidebar: 260px;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: var(--bg); color: var(--text); line-height:1.6;
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); line-height:1.5; height:100vh; overflow:hidden; }
+a { color:var(--primary-light); text-decoration:none; }
+button { cursor:pointer; font-family:inherit; }
+.hidden { display:none !important; }
+
+/* ── Topbar ── */
+#topbar {
+  position:fixed; top:0; left:0; right:0; height:var(--topbar);
+  background:var(--primary); color:#fff;
+  display:flex; align-items:center; padding:0 20px; gap:0; z-index:300;
+  box-shadow:0 2px 8px rgba(0,0,0,.2);
 }
-a { color: var(--primary-light); text-decoration:none; }
+.logo { font-size:18px; font-weight:800; letter-spacing:2px; color:#fff; margin-right:32px; }
+.logo span { font-size:11px; font-weight:400; opacity:.6; letter-spacing:0; margin-left:4px; }
+.nav-tabs { display:flex; gap:2px; flex:1; }
+.nav-tab {
+  padding:8px 18px; border:none; background:none; color:rgba(255,255,255,.7);
+  font-size:13px; font-weight:600; border-radius:6px; transition:.15s; position:relative;
+}
+.nav-tab:hover { background:rgba(255,255,255,.1); color:#fff; }
+.nav-tab.active { background:rgba(255,255,255,.18); color:#fff; }
+.nav-tab .badge-count {
+  position:absolute; top:4px; right:6px;
+  background:var(--pers); color:#fff; border-radius:10px;
+  font-size:10px; font-weight:700; padding:0 5px; min-width:16px; text-align:center;
+}
+.topbar-right { display:flex; align-items:center; gap:8px; }
+.notif-btn {
+  background:rgba(255,255,255,.12); border:none; color:#fff;
+  width:36px; height:36px; border-radius:8px; font-size:17px;
+  display:flex; align-items:center; justify-content:center; transition:.15s;
+  position:relative;
+}
+.notif-btn:hover { background:rgba(255,255,255,.22); }
+.notif-btn.off { opacity:.5; }
+.notif-btn.off::after { content:''; position:absolute; top:6px; right:6px; width:8px; height:8px; background:#ef4444; border-radius:50%; border:2px solid var(--primary); }
+#connection-dot {
+  width:8px; height:8px; border-radius:50%; background:#6b7280;
+  transition:.3s; margin-right:4px;
+}
+#connection-dot.connected { background:#22c55e; }
+#connection-dot.error { background:#ef4444; }
 
 /* ── Layout ── */
-.app { display:flex; min-height:100vh; }
-.sidebar {
-  width:260px; background:var(--primary); color:#fff;
-  padding:24px 0; display:flex; flex-direction:column;
-  position:fixed; top:0; left:0; bottom:0; z-index:100;
-}
-.sidebar h1 { padding:0 24px 8px; font-size:20px; letter-spacing:1px; }
-.sidebar .subtitle { padding:0 24px 24px; font-size:11px; opacity:.6; }
-.sidebar nav { flex:1; }
-.sidebar nav a {
-  display:flex; align-items:center; gap:12px;
-  padding:12px 24px; color:#cbd5e0; transition:.2s;
-}
-.sidebar nav a:hover, .sidebar nav a.active { background:rgba(255,255,255,.1); color:#fff; }
-.sidebar nav a .icon { font-size:18px; width:24px; text-align:center; }
-.sidebar .user-info {
-  padding:16px 24px; border-top:1px solid rgba(255,255,255,.1);
-  font-size:13px;
-}
-.sidebar .user-info .email { opacity:.7; font-size:11px; }
-
-.main { margin-left:260px; flex:1; padding:32px; max-width:1200px; }
-
-/* ── Auth ── */
-.auth-container {
-  max-width:400px; margin:80px auto; background:var(--card);
-  border-radius:var(--radius); box-shadow:var(--shadow-lg); padding:48px;
-}
-.auth-container h1 { color:var(--primary); margin-bottom:8px; }
-.auth-container .subtitle { color:var(--text-light); margin-bottom:32px; font-size:14px; }
-.auth-container .tabs { display:flex; gap:0; margin-bottom:24px; }
-.auth-container .tabs button {
-  flex:1; padding:10px; border:2px solid var(--border); background:none;
-  cursor:pointer; font-size:14px; color:var(--text-light); transition:.2s;
-}
-.auth-container .tabs button:first-child { border-radius:8px 0 0 8px; }
-.auth-container .tabs button:last-child { border-radius:0 8px 8px 0; }
-.auth-container .tabs button.active {
-  background:var(--primary); color:#fff; border-color:var(--primary);
+#app {
+  display:flex; height:100vh; padding-top:var(--topbar);
 }
 
-/* ── Forms ── */
-.form-group { margin-bottom:16px; }
-.form-group label { display:block; font-size:13px; font-weight:600; margin-bottom:4px; }
-.form-group input, .form-group select {
-  width:100%; padding:10px 14px; border:1px solid var(--border);
-  border-radius:8px; font-size:14px; transition:.2s;
+/* ── Sidebar ── */
+#sidebar {
+  width:var(--sidebar); flex-shrink:0;
+  background:var(--card); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; overflow:hidden;
 }
-.form-group input:focus, .form-group select:focus {
-  outline:none; border-color:var(--primary-light); box-shadow:0 0 0 3px rgba(44,82,130,.15);
+.sidebar-head {
+  padding:10px 12px 8px; border-bottom:1px solid var(--border);
 }
-.btn {
-  padding:10px 20px; border:none; border-radius:8px; font-size:14px;
-  font-weight:600; cursor:pointer; transition:.2s; display:inline-flex;
-  align-items:center; gap:8px;
+.sidebar-nav { display:flex; align-items:center; justify-content:space-between; gap:4px; }
+.sidebar-nav h3 { font-size:12px; font-weight:700; color:var(--text-light); text-transform:uppercase; letter-spacing:.6px; flex:1; text-align:center; }
+.sidebar-nav-btn { background:none; border:none; color:var(--text-light); font-size:16px; cursor:pointer; padding:0 4px; line-height:1; border-radius:4px; }
+.sidebar-nav-btn:hover { background:var(--border); color:var(--text); }
+.li-collapse-btn { display:block; width:100%; margin-top:6px; font-size:10px; color:var(--primary); background:none; border:none; padding:2px 0; cursor:pointer; font-weight:600; text-align:left; }
+.li-collapse-btn:hover { text-decoration:underline; }
+#live-list { flex:1; overflow-y:auto; }
+.live-empty { padding:20px 16px; font-size:13px; color:var(--text-light); text-align:center; }
+.li-raadsleden { font-size:11px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
+.li-raadsleden-label { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--text-light); margin-bottom:4px; }
+.li-raadslid { font-size:10.5px; color:#374151; padding:2px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.li-raadslid .li-party { color:#9ca3af; font-size:9.5px; }
+.li-rest { margin-top:2px; }
+.li-showall-btn {
+  margin-top:5px; font-size:10px; color:var(--primary); background:none;
+  border:none; padding:0; cursor:pointer; font-weight:600;
 }
-.btn-primary { background:var(--primary); color:#fff; }
-.btn-primary:hover { background:var(--primary-light); }
-.btn-accent { background:var(--accent); color:#fff; }
-.btn-accent:hover { background:var(--accent-light); }
-.btn-outline { background:none; border:2px solid var(--border); color:var(--text); }
-.btn-outline:hover { border-color:var(--primary); color:var(--primary); }
-.btn-block { width:100%; justify-content:center; }
-.btn-sm { padding:6px 14px; font-size:12px; }
+.li-showall-btn:hover { text-decoration:underline; }
+.live-item {
+  padding:8px 14px; border-bottom:1px solid var(--border);
+  cursor:pointer; transition:.1s;
+}
+.live-item:hover { background:#f8f9fc; }
+.live-item.expanded { background:#f8f9fc; }
+.live-item .li-gemeente { font-size:12px; font-weight:700; margin-top:1px; }
+.live-item .li-title { font-size:10.5px; color:var(--text-light); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
+.live-item .li-time { font-size:10px; color:var(--text-light); display:flex; align-items:center; gap:4px; }
+.li-badge-live { display:inline-block; background:var(--pers-bg); color:var(--pers); font-size:9px; font-weight:700; text-transform:uppercase; padding:1px 6px; border-radius:8px; margin-right:4px; }
+.li-badge-no-stream { display:inline-block; background:#f1f5f9; color:#94a3b8; font-size:9px; font-weight:600; text-transform:uppercase; padding:1px 6px; border-radius:8px; margin-right:4px; }
+.li-terugkijk { display:inline-block; margin-top:4px; font-size:11px; font-weight:600; color:var(--primary-light); text-decoration:none; }
+.li-terugkijk:hover { text-decoration:underline; }
+.live-item.is-ended { opacity:.75; }
+.live-item.is-ended .li-badge-live { display:none; }
+.live-item.no-stream { opacity:.6; }
+.live-item.no-stream .li-gemeente { color:var(--text-light); font-weight:500; }
+.live-item.no-stream .li-time { color:var(--text-light); font-weight:400; }
+.live-item .li-expand-arrow { margin-left:auto; color:#ccc; font-size:10px; transition:transform .2s; }
+.live-item:hover .li-expand-arrow { color:var(--text-light); }
+.live-item.expanded .li-expand-arrow { transform:rotate(90deg); color:var(--primary); }
+.live-item .li-raadsleden { display:none; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
+.live-item.expanded .li-raadsleden { display:block; }
 
-/* ── Cards ── */
-.card {
-  background:var(--card); border-radius:var(--radius);
-  box-shadow:var(--shadow); padding:24px; margin-bottom:16px;
+/* ── Main content area ── */
+#main {
+  flex:1; overflow:hidden; display:flex; flex-direction:column;
 }
-.card h2 { font-size:18px; margin-bottom:16px; }
-.card h3 { font-size:15px; margin-bottom:8px; }
 
-.stats-grid {
-  display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr));
-  gap:16px; margin-bottom:24px;
-}
-.stat-card {
-  background:var(--card); border-radius:var(--radius); padding:20px;
-  box-shadow:var(--shadow); text-align:center;
-}
-.stat-card .number { font-size:32px; font-weight:700; color:var(--primary); }
-.stat-card .label { font-size:12px; color:var(--text-light); margin-top:4px; }
+/* ── Views ── */
+.view { flex:1; overflow-y:auto; display:none; padding:24px; }
+.view.active { display:block; }
 
-/* ── Meeting list ── */
-.meeting-item {
-  display:flex; align-items:flex-start; gap:16px; padding:16px 0;
-  border-bottom:1px solid var(--border);
+/* ══════════════════════════
+   NIEUWS VIEW
+══════════════════════════ */
+#feed-bar {
+  display:flex; align-items:center; gap:10px; margin-bottom:20px; flex-wrap:wrap;
 }
-.meeting-item:last-child { border:none; }
-.meeting-time {
-  font-size:14px; font-weight:700; color:var(--primary);
-  min-width:50px; padding-top:2px;
+#feed-bar h2 { font-size:20px; font-weight:700; margin-right:8px; }
+.filter-chip {
+  padding:5px 14px; border-radius:20px; font-size:12px; font-weight:600;
+  border:1.5px solid var(--border); background:none; color:var(--text-light); transition:.15s;
 }
-.meeting-info { flex:1; }
-.meeting-info .gemeente { font-weight:600; font-size:15px; }
-.meeting-info .titel { color:var(--text-light); font-size:13px; }
-.meeting-info .url { font-size:12px; margin-top:4px; }
+.filter-chip:hover { border-color:var(--text-light); }
+.filter-chip.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+.filter-chip.anp-chip.active { background:var(--pers); border-color:var(--pers); }
+.filter-chip.best-chip.active { background:var(--bestuurlijk); border-color:var(--bestuurlijk); }
+
+#articles-list { max-width:820px; }
+.article-card {
+  background:var(--card); border-radius:var(--radius); padding:18px 20px;
+  margin-bottom:12px; box-shadow:var(--shadow); border:1.5px solid transparent;
+  transition:.15s; cursor:pointer;
+}
+.article-card:hover { box-shadow:var(--shadow-md); border-color:var(--border); }
+.article-card.level-pers { border-left:4px solid var(--pers); }
+.article-card.level-bestuurlijk { border-left:4px solid var(--bestuurlijk); }
+.article-card.is-update {
+  border-left:4px solid #f59e0b;
+  background:linear-gradient(135deg, #fffbeb 0%, var(--card) 60%);
+}
+.badge-update {
+  background:#fef3c7; color:#b45309;
+  display:inline-block; padding:2px 9px; border-radius:10px;
+  font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.3px;
+}
+.article-card.new-article { animation:slideIn .35s ease; }
+@keyframes slideIn { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
+
+.card-meta { display:flex; gap:6px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
 .badge {
-  display:inline-block; padding:2px 10px; border-radius:12px;
-  font-size:11px; font-weight:600;
+  display:inline-block; padding:2px 9px; border-radius:10px;
+  font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.3px;
 }
-.badge-live { background:#fed7d7; color:var(--danger); }
-.badge-scheduled { background:#e2e8f0; color:var(--text-light); }
-.badge-stream { background:#c6f6d5; color:var(--success); }
+.badge-anp { background:var(--pers-bg); color:var(--pers); }
+.badge-bestuurlijk { background:var(--bestuurlijk-bg); color:var(--bestuurlijk); }
+.badge-topic { background:#f1f5f9; color:#4a5568; }
+.card-gemeente { font-size:12px; color:var(--text-light); }
+.card-time { font-size:11px; color:var(--text-light); margin-left:auto; }
+.card-title { font-size:15px; font-weight:700; margin-bottom:6px; line-height:1.3; }
+.card-body { font-size:13px; color:#4a5568; line-height:1.6; }
+.card-body.collapsed { display:-webkit-box; -webkit-line-clamp:3; line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.card-expand { font-size:12px; color:var(--primary-light); font-weight:600; margin-top:6px; background:none; border:none; padding:0; }
 
-/* ── Alerts ── */
-.alert-item {
-  display:flex; gap:16px; padding:16px; margin-bottom:12px;
-  border-radius:var(--radius); border-left:4px solid var(--accent);
-  background:var(--card); box-shadow:var(--shadow); cursor:pointer;
-  transition:.2s;
-}
-.alert-item:hover { box-shadow:var(--shadow-lg); transform:translateY(-1px); }
-.alert-item.unread { border-left-color:var(--danger); }
-.alert-item .alert-badge {
-  font-size:11px; font-weight:700; text-transform:uppercase;
-  color:var(--accent); margin-bottom:4px;
-}
-.alert-item.unread .alert-badge { color:var(--danger); }
-.alert-item .alert-title { font-weight:600; font-size:14px; }
-.alert-item .alert-summary { color:var(--text-light); font-size:13px; margin-top:4px; }
-.alert-item .alert-time { font-size:11px; color:var(--text-light); margin-top:6px; }
+.feed-empty { text-align:center; color:var(--text-light); padding:60px 20px; font-size:14px; }
+.feed-empty .big { font-size:40px; margin-bottom:12px; }
 
-/* ── Preferences ── */
-.topic-grid {
-  display:grid; grid-template-columns:1fr;
-  gap:12px;
+/* ══════════════════════════
+   KALENDER VIEW
+══════════════════════════ */
+.cal-toolbar {
+  display:flex; align-items:center; gap:12px; margin-bottom:20px;
 }
+.cal-toolbar h2 { font-size:20px; font-weight:700; }
+.cal-nav { display:flex; gap:6px; margin-left:auto; }
+.cal-btn {
+  padding:6px 14px; border:1.5px solid var(--border); border-radius:8px;
+  background:var(--card); font-size:13px; font-weight:600; transition:.15s; color:var(--text);
+}
+.cal-btn:hover { border-color:var(--primary); color:var(--primary); }
+.cal-btn.today-btn { background:var(--primary); color:#fff; border-color:var(--primary); }
+
+.cal-grid {
+  display:grid; grid-template-columns:repeat(7, 1fr); gap:10px;
+}
+.cal-day {
+  background:var(--card); border-radius:var(--radius); border:1.5px solid var(--border);
+  min-height:120px; padding:10px;
+}
+.cal-day.today { border-color:var(--primary); }
+.cal-day.empty { background:none; border-color:transparent; }
+.cal-day-header { font-size:11px; font-weight:700; color:var(--text-light); text-transform:uppercase; margin-bottom:2px; }
+.cal-day-num {
+  font-size:18px; font-weight:700; margin-bottom:8px; line-height:1;
+  color:var(--text);
+}
+.cal-day.today .cal-day-num {
+  background:var(--primary); color:#fff; width:28px; height:28px;
+  border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:14px;
+}
+.cal-meeting {
+  font-size:11px; padding:4px 7px; border-radius:6px; margin-bottom:4px;
+  border-left:3px solid var(--border); background:#f8f9fc; cursor:pointer;
+  transition:.1s; line-height:1.3;
+}
+.cal-meeting:hover { background:#f0f2f7; }
+.cal-meeting.is-live { border-left-color:var(--live); background:var(--pers-bg); }
+.cal-meeting.has-stream { border-left-color:var(--bestuurlijk); }
+.cal-meeting .cm-time { font-weight:700; color:var(--primary); }
+.cal-meeting .cm-gem { color:var(--text-light); }
+.cal-meeting .cm-title { color:var(--text); display:block; }
+
+.cal-week-label {
+  font-size:13px; color:var(--text-light); margin-bottom:12px; font-weight:500;
+}
+.no-gemeente-msg {
+  text-align:center; color:var(--text-light); padding:40px; font-size:14px;
+  background:var(--card); border-radius:var(--radius); border:1.5px dashed var(--border);
+}
+
+/* ══════════════════════════
+   INSTELLINGEN VIEW
+══════════════════════════ */
+.settings-section { max-width:720px; margin-bottom:32px; }
+.settings-section h3 { font-size:16px; font-weight:700; margin-bottom:4px; }
+.settings-section .desc { font-size:13px; color:var(--text-light); margin-bottom:16px; }
+
+/* Topic rows */
 .topic-row {
-  display:flex; align-items:center; gap:12px; padding:14px 16px;
-  border:2px solid var(--border); border-radius:8px; transition:.2s;
+  display:flex; align-items:center; gap:12px; padding:12px 16px;
+  border:1.5px solid var(--border); border-radius:var(--radius);
+  margin-bottom:8px; background:var(--card);
 }
-.topic-row .topic-name {
-  flex:1; font-weight:600; font-size:14px; min-width:200px;
-}
-.level-selector {
-  display:flex; gap:0; border-radius:6px; overflow:hidden;
-  border:1px solid var(--border);
-}
+.topic-name { flex:1; font-size:14px; font-weight:600; }
+.level-btns { display:flex; gap:6px; }
 .level-btn {
-  padding:6px 14px; font-size:12px; font-weight:600;
-  cursor:pointer; transition:.2s; border:none; background:none;
-  color:var(--text-light); white-space:nowrap;
+  padding:5px 12px; border-radius:16px; font-size:11px; font-weight:600;
+  border:1.5px solid var(--border); background:none; color:var(--text-light); transition:.15s;
 }
-.level-btn:not(:last-child) { border-right:1px solid var(--border); }
-.level-btn:hover { background:var(--bg); }
-.level-btn.active-geen { background:#e2e8f0; color:var(--text); }
-.level-btn.active-bestuurlijk { background:var(--primary); color:#fff; }
-.level-btn.active-pers { background:var(--accent); color:#fff; }
-.badge-bestuurlijk { background:rgba(26,54,93,.1); color:var(--primary); }
-.badge-pers { background:rgba(230,126,34,.1); color:var(--accent); }
+.level-btn:hover { border-color:var(--text-light); }
+.level-btn.active-geen { background:#f1f5f9; color:var(--text); border-color:#cbd5e0; }
+.level-btn.active-pers { background:var(--pers-bg); color:var(--pers); border-color:var(--pers); }
+.level-btn.active-bestuurlijk { background:var(--bestuurlijk-bg); color:var(--bestuurlijk); border-color:var(--bestuurlijk); }
+.level-btn.active-beide { background:#ede9fe; color:#6d28d9; border-color:#a78bfa; }
 
-.gemeente-search {
-  position:relative; margin-bottom:16px;
+/* Gemeente selector */
+.province-item {
+  border:1.5px solid var(--border); border-radius:var(--radius);
+  background:var(--card); margin-bottom:8px; overflow:hidden;
 }
-.gemeente-search input {
-  width:100%; padding:10px 14px; border:1px solid var(--border);
-  border-radius:8px; font-size:14px;
+.province-header {
+  display:flex; align-items:center; gap:10px; padding:11px 16px;
+  user-select:none;
 }
-.gemeente-tags {
-  display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;
+.province-header:hover { background:var(--bg); }
+.p-name { flex:1; font-size:13px; font-weight:600; cursor:pointer; }
+.p-count { font-size:11px; color:var(--text-light); }
+.p-arrow { font-size:13px; color:var(--text-light); transition:.2s; cursor:pointer; padding:0 2px; }
+.p-arrow:hover { color:var(--text); }
+.province-item.open .p-arrow { transform:rotate(180deg); }
+.province-item.prov-selected .province-header { background:#eff6ff; }
+.province-item.prov-selected .p-name { color:var(--primary); }
+.gemeente-grid { display:none; padding:8px 16px 14px; border-top:1px solid var(--border); flex-wrap:wrap; gap:6px; }
+.province-item.open .gemeente-grid { display:flex; }
+.gem-chip {
+  padding:4px 12px; border-radius:14px; font-size:12px; font-weight:500;
+  border:1.5px solid var(--border); background:none; color:var(--text-light); transition:.15s;
 }
-.gemeente-tag {
-  display:inline-flex; align-items:center; gap:6px;
-  padding:4px 12px; background:var(--primary); color:#fff;
-  border-radius:16px; font-size:12px;
-}
-.gemeente-tag .remove { cursor:pointer; opacity:.7; }
-.gemeente-tag .remove:hover { opacity:1; }
-.gemeente-dropdown {
-  position:absolute; top:100%; left:0; right:0;
-  background:var(--card); border:1px solid var(--border);
-  border-radius:8px; max-height:200px; overflow-y:auto;
-  box-shadow:var(--shadow-lg); z-index:50; display:none;
-}
-.gemeente-dropdown.open { display:block; }
-.gemeente-dropdown div {
-  padding:8px 14px; cursor:pointer; font-size:13px;
-}
-.gemeente-dropdown div:hover { background:var(--bg); }
+.gem-chip:hover { border-color:var(--primary-light); color:var(--primary); }
+.gem-chip.selected { background:var(--primary); color:#fff; border-color:var(--primary); }
 
-/* ── Transcript ── */
-.transcript-header {
-  display:flex; justify-content:space-between; align-items:center;
-  margin-bottom:16px;
+/* Notificaties toggle in instellingen */
+.notif-setting {
+  display:flex; align-items:center; gap:14px; padding:14px 16px;
+  border:1.5px solid var(--border); border-radius:var(--radius); background:var(--card);
 }
-.transcript-chunks { max-height:60vh; overflow-y:auto; padding:8px 0; }
-.chunk {
-  padding:12px 16px; margin-bottom:8px; border-radius:8px;
-  background:var(--bg); transition:.2s;
+.notif-setting .ns-label { flex:1; font-size:14px; font-weight:600; }
+.notif-setting .ns-desc { font-size:12px; color:var(--text-light); }
+.toggle {
+  width:44px; height:24px; border-radius:12px; background:#cbd5e0; border:none;
+  position:relative; transition:.2s; flex-shrink:0;
 }
-.chunk.highlighted { background:#fefcbf; border-left:3px solid var(--accent); }
-.chunk .speaker {
-  font-weight:700; font-size:13px; color:var(--primary); margin-bottom:2px;
+.toggle::after {
+  content:''; position:absolute; top:3px; left:3px;
+  width:18px; height:18px; border-radius:50%; background:#fff;
+  transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.2);
 }
-.chunk .time { font-size:11px; color:var(--text-light); float:right; }
-.chunk .text { font-size:14px; line-height:1.7; }
+.toggle.on { background:var(--primary); }
+.toggle.on::after { left:23px; }
 
-/* ── Toast notification ── */
-.toast-container { position:fixed; top:20px; right:20px; z-index:1000; }
-.toast {
-  background:var(--card); border-radius:var(--radius); padding:16px 20px;
-  box-shadow:var(--shadow-lg); margin-bottom:12px; max-width:380px;
-  border-left:4px solid var(--accent); animation:slideIn .3s ease;
-  cursor:pointer;
+/* ══════════════════════════
+   POPUP NOTIFICATIES
+══════════════════════════ */
+#popup-container {
+  position:fixed; bottom:20px; right:20px; z-index:1000;
+  display:flex; flex-direction:column-reverse; gap:10px;
+  pointer-events:none;
 }
-.toast.news { border-left-color:var(--danger); }
-.toast .toast-badge { font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase; }
-.toast.news .toast-badge { color:var(--danger); }
-.toast .toast-title { font-weight:600; font-size:14px; margin:4px 0; }
-.toast .toast-text { font-size:13px; color:var(--text-light); }
-@keyframes slideIn { from{transform:translateX(100%);opacity:0} to{transform:none;opacity:1} }
+.popup-toast {
+  background:var(--card); border-radius:var(--radius); padding:14px 16px;
+  box-shadow:var(--shadow-md); border-left:4px solid var(--pers);
+  width:320px; pointer-events:all; animation:toastIn .3s ease;
+  position:relative;
+}
+.popup-toast.level-bestuurlijk { border-left-color:var(--bestuurlijk); }
+@keyframes toastIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
+@keyframes toastOut { to { opacity:0; transform:translateX(30px); } }
+.popup-toast.removing { animation:toastOut .25s ease forwards; }
+.pt-meta { display:flex; gap:6px; align-items:center; margin-bottom:6px; }
+.pt-title { font-size:13px; font-weight:700; line-height:1.3; margin-bottom:4px; }
+.pt-gemeente { font-size:11px; color:var(--text-light); }
+.pt-close {
+  position:absolute; top:8px; right:10px;
+  background:none; border:none; font-size:16px; color:var(--text-light);
+  line-height:1; padding:2px;
+}
+.pt-close:hover { color:var(--text); }
 
-/* ── Responsive ── */
-@media (max-width:768px) {
-  .sidebar { display:none; }
-  .main { margin-left:0; padding:16px; }
-  .stats-grid { grid-template-columns:repeat(2,1fr); }
+/* ══════════════════════════
+   BRONNEN (URL-beheer)
+══════════════════════════ */
+#view-bronnen { padding:0; }
+.bronnen-toolbar {
+  display:flex; align-items:center; gap:12px; padding:16px 24px 12px;
+  border-bottom:1px solid var(--border); background:var(--card);
+  position:sticky; top:0; z-index:10;
 }
+.bronnen-toolbar h2 { font-size:18px; font-weight:800; flex:none; }
+#bronnen-search {
+  flex:1; max-width:320px; padding:7px 12px; border:1.5px solid var(--border);
+  border-radius:8px; font-size:13px; outline:none;
+}
+#bronnen-search:focus { border-color:var(--primary-light); }
+.bronnen-stat { font-size:12px; color:var(--text-light); margin-left:auto; }
 
-.hidden { display:none !important; }
-.page { display:none; }
-.page.active { display:block; }
-.role-select { display:flex; gap:12px; margin-bottom:16px; }
-.role-btn {
-  flex:1; padding:16px; border:2px solid var(--border); border-radius:8px;
-  text-align:center; cursor:pointer; transition:.2s;
+.bronnen-table-wrap { overflow-x:auto; }
+table.bronnen-tbl {
+  width:100%; border-collapse:collapse; font-size:13px;
 }
-.role-btn:hover { border-color:var(--primary-light); }
-.role-btn.selected { border-color:var(--primary); background:rgba(26,54,93,.06); }
-.role-btn .role-icon { font-size:24px; margin-bottom:8px; }
-.role-btn .role-name { font-weight:600; font-size:14px; }
-.role-btn .role-desc { font-size:11px; color:var(--text-light); margin-top:4px; }
+.bronnen-tbl th {
+  text-align:left; padding:9px 14px; font-size:11px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.05em; color:var(--text-light);
+  border-bottom:2px solid var(--border); background:var(--bg);
+  position:sticky; top:53px;
+}
+.bronnen-tbl td { padding:8px 14px; border-bottom:1px solid var(--border); vertical-align:middle; }
+.bronnen-tbl tr:hover td { background:#f8fafc; }
+.bron-naam { font-weight:600; font-size:13px; }
+.bron-platforms { display:flex; flex-wrap:wrap; gap:4px; }
+.bron-platform-badge {
+  font-size:10px; font-weight:600; padding:2px 7px; border-radius:8px;
+  background:#e2e8f0; color:#4a5568; text-transform:uppercase;
+}
+.bron-platform-badge.cwc { background:#dbeafe; color:#1e40af; }
+.bron-platform-badge.qualigraf { background:#d1fae5; color:#065f46; }
+.bron-platform-badge.parlaeus { background:#ede9fe; color:#5b21b6; }
+.bron-platform-badge.notubiz { background:#fef3c7; color:#92400e; }
+.bron-platform-badge.ibabs { background:#fee2e2; color:#991b1b; }
+.bron-platform-badge.youtube { background:#fce7f3; color:#9d174d; }
+.bron-platform-badge.gemeenteoplossingen { background:#ecfdf5; color:#065f46; }
+.bron-url-cell { min-width:280px; }
+.bron-url-display {
+  display:flex; align-items:center; gap:6px;
+}
+.bron-url-link {
+  font-size:12px; color:var(--primary-light); word-break:break-all; max-width:240px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.bron-url-link:hover { text-decoration:underline; }
+.bron-url-empty { font-size:12px; color:#cbd5e0; font-style:italic; }
+.bron-edit-btn {
+  background:none; border:none; font-size:13px; color:var(--text-light);
+  padding:2px 5px; border-radius:4px; line-height:1; flex-shrink:0;
+}
+.bron-edit-btn:hover { background:var(--border); color:var(--text); }
+.bron-url-edit { display:none; gap:4px; align-items:center; }
+.bron-url-edit.active { display:flex; }
+.bron-url-input {
+  flex:1; padding:5px 8px; border:1.5px solid var(--primary-light);
+  border-radius:6px; font-size:12px; outline:none; min-width:200px;
+}
+.bron-save-btn {
+  padding:4px 10px; background:var(--primary); color:#fff;
+  border:none; border-radius:6px; font-size:12px; font-weight:600;
+}
+.bron-cancel-btn {
+  padding:4px 10px; background:none; border:1px solid var(--border);
+  border-radius:6px; font-size:12px; color:var(--text-light);
+}
 </style>
 </head>
 <body>
 
-<!-- ============ AUTH ============ -->
-<div id="auth-page" class="page active">
-  <div class="auth-container">
-    <h1>RANST</h1>
-    <div class="subtitle">Raadsinformatie Analyse & Notificatie Systeem</div>
-
-    <div class="tabs">
-      <button class="active" onclick="showAuthTab('login')">Inloggen</button>
-      <button onclick="showAuthTab('register')">Registreren</button>
-    </div>
-
-    <form id="login-form" onsubmit="return doLogin(event)">
-      <div class="form-group">
-        <label>Email</label>
-        <input type="email" id="login-email" required placeholder="naam@organisatie.nl">
-      </div>
-      <div class="form-group">
-        <label>Wachtwoord</label>
-        <input type="password" id="login-password" required>
-      </div>
-      <button type="submit" class="btn btn-primary btn-block">Inloggen</button>
-    </form>
-
-    <form id="register-form" class="hidden" onsubmit="return doRegister(event)">
-      <div class="form-group">
-        <label>Naam</label>
-        <input type="text" id="reg-name" placeholder="Uw naam">
-      </div>
-      <div class="form-group">
-        <label>Email</label>
-        <input type="email" id="reg-email" required placeholder="naam@organisatie.nl">
-      </div>
-      <div class="form-group">
-        <label>Wachtwoord</label>
-        <input type="password" id="reg-password" required minlength="4">
-      </div>
-      <div class="form-group">
-        <label>Ik ontvang meldingen als</label>
-        <div class="role-select">
-          <div class="role-btn selected" onclick="selectRole('ps')" data-role="ps">
-            <div class="role-icon">🏛️</div>
-            <div class="role-name">Provinciale Staten</div>
-            <div class="role-desc">Sector-meldingen per onderwerp</div>
-          </div>
-          <div class="role-btn" onclick="selectRole('anp')" data-role="anp">
-            <div class="role-icon">📰</div>
-            <div class="role-name">ANP / Pers</div>
-            <div class="role-desc">Nieuwswaardige meldingen</div>
-          </div>
-        </div>
-        <input type="hidden" id="reg-role" value="ps">
-      </div>
-      <button type="submit" class="btn btn-primary btn-block">Account aanmaken</button>
-    </form>
-
-    <div id="auth-error" style="color:var(--danger);font-size:13px;margin-top:12px;"></div>
+<!-- ── Topbar ── -->
+<div id="topbar">
+  <div class="logo">RANST <span>Raadsinformatie</span></div>
+  <nav class="nav-tabs">
+    <button class="nav-tab active" data-view="nieuws">Nieuws</button>
+    <button class="nav-tab" data-view="kalender">Kalender</button>
+    <button class="nav-tab" data-view="bronnen">Bronnen</button>
+    <button class="nav-tab" data-view="instellingen">Instellingen</button>
+  </nav>
+  <div class="topbar-right">
+    <div id="connection-dot" title="Verbinding"></div>
+    <button class="notif-btn on" id="notif-toggle" title="Notificaties aan/uit">🔔</button>
   </div>
 </div>
 
-<!-- ============ APP ============ -->
-<div id="app-shell" class="app hidden">
-  <aside class="sidebar">
-    <h1>RANST</h1>
-    <div class="subtitle">Raadsinformatie Analyse</div>
-    <nav>
-      <a href="#dashboard" class="active" onclick="navigate('dashboard')">
-        <span class="icon">📊</span> Dashboard
-      </a>
-      <a href="#meetings" onclick="navigate('meetings')">
-        <span class="icon">📋</span> Vergaderingen
-      </a>
-      <a href="#alerts" onclick="navigate('alerts')">
-        <span class="icon">🔔</span> Meldingen <span id="alert-count" class="badge badge-live hidden">0</span>
-      </a>
-      <a href="#transcript" onclick="navigate('transcript')">
-        <span class="icon">📝</span> Transcript
-      </a>
-      <a href="#preferences" onclick="navigate('preferences')">
-        <span class="icon">⚙️</span> Voorkeuren
-      </a>
-    </nav>
-    <div class="user-info">
-      <div id="user-name"></div>
-      <div class="email" id="user-email"></div>
-      <button class="btn btn-outline btn-sm" style="margin-top:10px;color:#cbd5e0;border-color:rgba(255,255,255,.2);" onclick="doLogout()">Uitloggen</button>
+<!-- ── App layout ── -->
+<div id="app">
+  <!-- Sidebar: live meetings -->
+  <div id="sidebar">
+    <div class="sidebar-head">
+      <div class="sidebar-nav">
+        <button class="sidebar-nav-btn" onclick="shiftSidebarDate(-1)">‹</button>
+        <h3 id="sidebar-date-label">Vandaag</h3>
+        <button class="sidebar-nav-btn" onclick="shiftSidebarDate(1)">›</button>
+      </div>
     </div>
-  </aside>
+    <div id="live-list">
+      <div class="live-empty">Geen live vergaderingen</div>
+    </div>
+  </div>
 
-  <main class="main">
-    <!-- Dashboard -->
-    <div id="page-dashboard" class="page active">
-      <h2 style="margin-bottom:24px;">Dashboard</h2>
-      <div class="stats-grid" id="stats-grid"></div>
+  <!-- Main -->
+  <div id="main">
 
-      <div style="display:flex;gap:16px;margin-bottom:24px;">
-        <button class="btn btn-accent" onclick="startDemo()">▶ Start Demo Vergadering</button>
+    <!-- Nieuws -->
+    <div class="view active" id="view-nieuws">
+      <div id="feed-bar">
+        <h2>Nieuwsfeed</h2>
+        <button class="filter-chip active" data-filter="alle">Alle</button>
+        <button class="filter-chip anp-chip" data-filter="pers">ANP</button>
+        <button class="filter-chip best-chip" data-filter="bestuurlijk">Bestuurlijk</button>
       </div>
-
-      <div class="card">
-        <h2>Live vergaderingen</h2>
-        <div id="live-meetings">
-          <p style="color:var(--text-light)">Laden...</p>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>Recente meldingen</h2>
-        <div id="recent-alerts">
-          <p style="color:var(--text-light)">Geen meldingen nog</p>
+      <div id="articles-list">
+        <div class="feed-empty">
+          <div class="big">📰</div>
+          Nog geen artikelen. Selecteer gemeenten in Instellingen<br>en start de pipeline.
         </div>
       </div>
     </div>
 
-    <!-- Meetings -->
-    <div id="page-meetings" class="page">
-      <h2 style="margin-bottom:24px;">Vergaderingen vandaag</h2>
-      <div class="card">
-        <div id="today-meetings">Laden...</div>
+    <!-- Kalender -->
+    <div class="view" id="view-kalender">
+      <div class="cal-toolbar">
+        <h2>Vergaderkalender</h2>
+        <div class="cal-nav">
+          <button class="cal-btn" id="cal-prev">← Vorige week</button>
+          <button class="cal-btn today-btn" id="cal-today">Vandaag</button>
+          <button class="cal-btn" id="cal-next">Volgende week →</button>
+        </div>
       </div>
-      <h2 style="margin:24px 0;">Komende week</h2>
-      <div class="card">
-        <div id="upcoming-meetings">Laden...</div>
+      <div class="cal-week-label" id="cal-week-label"></div>
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
+
+    <!-- Bronnen -->
+    <div class="view" id="view-bronnen">
+      <div class="bronnen-toolbar">
+        <h2>Bronnen</h2>
+        <input id="bronnen-search" type="search" placeholder="Zoek gemeente…" oninput="filterBronnen()">
+        <span class="bronnen-stat" id="bronnen-stat"></span>
+      </div>
+      <div class="bronnen-table-wrap">
+        <table class="bronnen-tbl">
+          <thead>
+            <tr>
+              <th>Gemeente</th>
+              <th>Platforms</th>
+              <th>Raadsinformatie URL (go_url)</th>
+              <th>Website</th>
+            </tr>
+          </thead>
+          <tbody id="bronnen-tbody"></tbody>
+        </table>
       </div>
     </div>
 
-    <!-- Alerts -->
-    <div id="page-alerts" class="page">
-      <h2 style="margin-bottom:24px;">Meldingen</h2>
-      <div id="alerts-list">Laden...</div>
-    </div>
+    <!-- Instellingen -->
+    <div class="view" id="view-instellingen">
 
-    <!-- Transcript -->
-    <div id="page-transcript" class="page">
-      <div class="card">
-        <div class="transcript-header">
+      <div class="settings-section">
+        <h3>Meldingen</h3>
+        <p class="desc">Popup-notificaties tonen bij nieuwe artikelen.</p>
+        <div class="notif-setting">
           <div>
-            <h2 id="transcript-title">Transcript</h2>
-            <div id="transcript-subtitle" style="color:var(--text-light);font-size:13px;"></div>
+            <div class="ns-label">Popup-notificaties</div>
+            <div class="ns-desc">Verschijnt rechtsonder bij een nieuw artikel</div>
           </div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <a id="transcript-stream-link" href="#" target="_blank" class="btn btn-accent btn-sm hidden">
-              Bekijk livestream
-            </a>
-          </div>
-        </div>
-        <div style="margin-bottom:12px;">
-          <input type="text" id="transcript-search" placeholder="Doorzoek transcript..." 
-                 style="width:100%;padding:8px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;"
-                 oninput="searchTranscript()">
-        </div>
-        <div id="transcript-chunks" class="transcript-chunks">
-          <p style="color:var(--text-light)">Start een demo-vergadering om een transcript te zien.</p>
+          <button class="toggle on" id="notif-setting-toggle"></button>
         </div>
       </div>
-    </div>
 
-    <!-- Preferences -->
-    <div id="page-preferences" class="page">
-      <h2 style="margin-bottom:24px;">Voorkeuren</h2>
-
-      <div class="card">
-        <h3>Onderwerpen & Interesse-niveau</h3>
-        <p style="color:var(--text-light);font-size:13px;margin-bottom:8px;">
-          Kies per onderwerp uw interesse-niveau:
-        </p>
-        <div style="display:flex;gap:16px;margin-bottom:16px;font-size:12px;color:var(--text-light);">
-          <span><strong>Geen</strong> — geen meldingen</span>
-          <span><strong style="color:var(--primary)">Bestuurlijk</strong> — actionable inzichten voor PS</span>
-          <span><strong style="color:var(--accent)">Nieuwsredactie</strong> — beknopt nieuwsbericht</span>
-        </div>
-        <div class="topic-grid" id="topics-grid"></div>
+      <div class="settings-section">
+        <h3>Onderwerpen</h3>
+        <p class="desc">Kies per onderwerp welk type artikel je wilt zien: Geen, ANP, Bestuurlijk of Beide.</p>
+        <div id="topics-list"></div>
       </div>
 
-      <div class="card" style="margin-top:16px;">
+      <div class="settings-section">
         <h3>Gemeenten</h3>
-        <p style="color:var(--text-light);font-size:13px;margin-bottom:16px;">
-          Selecteer de gemeenten die u wilt volgen. Laat leeg voor alle gemeenten.
-        </p>
-        <div class="gemeente-search">
-          <input type="text" id="gemeente-input" placeholder="Zoek gemeente..."
-                 oninput="filterGemeenten()" onfocus="showGemeenteDropdown()">
-          <div class="gemeente-dropdown" id="gemeente-dropdown"></div>
-        </div>
-        <div class="gemeente-tags" id="gemeente-tags"></div>
+        <p class="desc">Selecteer de gemeenten die je wilt volgen. De nieuwsfeed en kalender tonen alleen deze gemeenten.</p>
+        <div id="province-list"></div>
       </div>
 
-      <button class="btn btn-primary" style="margin-top:16px;" onclick="savePreferences()">
-        Voorkeuren opslaan
-      </button>
     </div>
-  </main>
+
+  </div>
 </div>
 
-<!-- Toast container -->
-<div class="toast-container" id="toast-container"></div>
+<!-- Popup container -->
+<div id="popup-container"></div>
 
 <script>
-// ── State ──
-let token = localStorage.getItem('ranst_token');
-let user = null;
-let prefs = { topics: {}, gemeenten: [] };
-let allTopics = {};
-let interestLevels = {};
-let allGemeenten = [];
-let currentMeetingId = null;
-let transcriptPollInterval = null;
-let eventSource = null;
-let lastTranscriptTime = 0;
+// ── State ─────────────────────────────────────────────────────────────────
+const S = {
+  prefs: {
+    gemeenten: [],
+    topics: {},        // { topic_id: 'geen'|'pers'|'bestuurlijk'|'beide' }
+    notifications: true,
+  },
+  articles: [],
+  feedFilter: 'alle',
+  calOffset: 0,        // weken t.o.v. vandaag
+};
 
-const API = '';
-
-// ── API helper ──
-async function api(path, opts = {}) {
-  const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = 'Bearer ' + token;
-  const res = await fetch(API + path, { ...opts, headers });
-  if (res.status === 401) { doLogout(); throw new Error('Unauthorized'); }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'API error');
-  }
-  return res.json();
+// ── LocalStorage ──────────────────────────────────────────────────────────
+function savePrefs() {
+  localStorage.setItem('ranst_prefs', JSON.stringify(S.prefs));
+}
+function loadPrefs() {
+  try {
+    const raw = localStorage.getItem('ranst_prefs');
+    if (raw) Object.assign(S.prefs, JSON.parse(raw));
+  } catch(e) {}
 }
 
-// ── Auth ──
-function showAuthTab(tab) {
-  document.querySelectorAll('.auth-container .tabs button').forEach(b => b.classList.remove('active'));
-  if (tab === 'login') {
-    document.querySelector('.tabs button:first-child').classList.add('active');
-    document.getElementById('login-form').classList.remove('hidden');
-    document.getElementById('register-form').classList.add('hidden');
-  } else {
-    document.querySelector('.tabs button:last-child').classList.add('active');
-    document.getElementById('login-form').classList.add('hidden');
-    document.getElementById('register-form').classList.remove('hidden');
-  }
-}
-
-function selectRole(role) {
-  document.getElementById('reg-role').value = role;
-  document.querySelectorAll('.role-btn').forEach(b => {
-    b.classList.toggle('selected', b.dataset.role === role);
+// ── Navigation ────────────────────────────────────────────────────────────
+document.querySelectorAll('.nav-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const v = btn.dataset.view;
+    document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+    document.getElementById('view-' + v).classList.add('active');
+    if (v === 'kalender') renderCalendar();
+    if (v === 'instellingen') renderSettings();
   });
+});
+
+// ── Notification toggle ───────────────────────────────────────────────────
+const notifBtn = document.getElementById('notif-toggle');
+const notifSettingBtn = document.getElementById('notif-setting-toggle');
+
+function updateNotifUI() {
+  const on = S.prefs.notifications;
+  notifBtn.classList.toggle('on', on);
+  notifBtn.classList.toggle('off', !on);
+  notifBtn.textContent = on ? '🔔' : '🔕';
+  notifSettingBtn.classList.toggle('on', on);
+}
+notifBtn.addEventListener('click', () => {
+  S.prefs.notifications = !S.prefs.notifications;
+  savePrefs();
+  updateNotifUI();
+});
+notifSettingBtn.addEventListener('click', () => {
+  S.prefs.notifications = !S.prefs.notifications;
+  savePrefs();
+  updateNotifUI();
+});
+
+// ── Feed filter ───────────────────────────────────────────────────────────
+document.querySelectorAll('.filter-chip').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    S.feedFilter = btn.dataset.filter;
+    renderFeed();
+  });
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function levelBadge(level) {
+  if (level === 'pers') return '<span class="badge badge-anp">ANP</span>';
+  return '<span class="badge badge-bestuurlijk">Bestuurlijk</span>';
+}
+function topicName(topicId) {
+  return (window._topics && window._topics[topicId]) || topicId;
+}
+function fmt_time(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString('nl-NL', {hour:'2-digit', minute:'2-digit'});
+  } catch(e) { return ''; }
+}
+function fmt_date(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('nl-NL', {day:'numeric', month:'short'});
+  } catch(e) { return iso; }
 }
 
-async function doLogin(e) {
-  e.preventDefault();
-  try {
-    const data = await api('/api/login', {
-      method: 'POST',
-      body: JSON.stringify({
-        email: document.getElementById('login-email').value,
-        password: document.getElementById('login-password').value,
-      }),
-    });
-    token = data.token;
-    user = data.user;
-    localStorage.setItem('ranst_token', token);
-    enterApp();
-  } catch (err) {
-    document.getElementById('auth-error').textContent = err.message;
+// ── Feed ──────────────────────────────────────────────────────────────────
+function articleMatchesPrefs(art) {
+  const gem = S.prefs.gemeenten;
+  if (gem.length > 0 && !gem.includes(art.gemeente)) return false;
+
+  const level = S.prefs.topics[art.topic];
+  if (!level || level === 'geen') return false;
+  if (level === 'beide') return true;
+  return level === art.level;
+}
+
+function renderFeed() {
+  const list = document.getElementById('articles-list');
+  let articles = S.articles.filter(articleMatchesPrefs);
+
+  if (S.feedFilter === 'pers') articles = articles.filter(a => a.level === 'pers');
+  if (S.feedFilter === 'bestuurlijk') articles = articles.filter(a => a.level === 'bestuurlijk');
+
+  if (articles.length === 0) {
+    list.innerHTML = `<div class="feed-empty"><div class="big">📰</div>
+      Nog geen artikelen${S.prefs.gemeenten.length === 0 ? '<br>Selecteer gemeenten in Instellingen' : ''}</div>`;
+    return;
   }
-  return false;
-}
 
-async function doRegister(e) {
-  e.preventDefault();
-  try {
-    const data = await api('/api/register', {
-      method: 'POST',
-      body: JSON.stringify({
-        name: document.getElementById('reg-name').value,
-        email: document.getElementById('reg-email').value,
-        password: document.getElementById('reg-password').value,
-        role: document.getElementById('reg-role').value,
-      }),
-    });
-    token = data.token;
-    user = data.user;
-    localStorage.setItem('ranst_token', token);
-    enterApp();
-  } catch (err) {
-    document.getElementById('auth-error').textContent = err.message;
-  }
-  return false;
-}
-
-function doLogout() {
-  api('/api/logout', { method: 'POST' }).catch(() => {});
-  token = null; user = null;
-  localStorage.removeItem('ranst_token');
-  if (eventSource) { eventSource.close(); eventSource = null; }
-  document.getElementById('auth-page').classList.add('active');
-  document.getElementById('app-shell').classList.add('hidden');
-}
-
-// ── App init ──
-async function enterApp() {
-  document.getElementById('auth-page').classList.remove('active');
-  document.getElementById('app-shell').classList.remove('hidden');
-
-  try {
-    user = await api('/api/me');
-  } catch { doLogout(); return; }
-
-  document.getElementById('user-name').textContent = user.name || user.email;
-  document.getElementById('user-email').textContent = user.email;
-
-  const topicsData = await api('/api/topics');
-  allTopics = topicsData.topics || topicsData;
-  interestLevels = topicsData.interest_levels || {};
-  allGemeenten = await api('/api/gemeenten');
-  prefs = await api('/api/preferences');
-  // Ensure topics is a dict
-  if (Array.isArray(prefs.topics)) {
-    const obj = {};
-    prefs.topics.forEach(t => obj[t] = 'bestuurlijk');
-    prefs.topics = obj;
-  }
-
-  renderTopics();
-  renderGemeentenTags();
-  loadDashboard();
-  connectSSE();
-  navigate('dashboard');
-}
-
-// ── Navigation ──
-function navigate(page) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById('page-' + page).classList.add('active');
-  document.querySelectorAll('.sidebar nav a').forEach(a => a.classList.remove('active'));
-  document.querySelector(`[href="#${page}"]`)?.classList.add('active');
-
-  if (page === 'dashboard') loadDashboard();
-  if (page === 'meetings') loadMeetings();
-  if (page === 'alerts') loadAlerts();
-  if (page === 'transcript') loadTranscript();
-}
-
-// ── Dashboard ──
-async function loadDashboard() {
-  try {
-    const stats = await api('/api/stats');
-    document.getElementById('stats-grid').innerHTML = `
-      <div class="stat-card"><div class="number">${stats.live}</div><div class="label">Live nu</div></div>
-      <div class="stat-card"><div class="number">${stats.today}</div><div class="label">Vandaag</div></div>
-      <div class="stat-card"><div class="number">${stats.scheduled}</div><div class="label">Gepland</div></div>
-      <div class="stat-card"><div class="number">${stats.gemeenten}</div><div class="label">Gemeenten</div></div>
-      <div class="stat-card"><div class="number">${stats.alerts}</div><div class="label">Meldingen</div></div>
-      <div class="stat-card"><div class="number">${stats.users}</div><div class="label">Gebruikers</div></div>
-    `;
-
-    const live = await api('/api/meetings/live');
-    document.getElementById('live-meetings').innerHTML = live.length
-      ? live.map(renderMeeting).join('')
-      : '<p style="color:var(--text-light)">Geen live vergaderingen op dit moment</p>';
-
-    const alerts = await api('/api/alerts?limit=5');
-    document.getElementById('recent-alerts').innerHTML = alerts.length
-      ? alerts.map(renderAlert).join('')
-      : '<p style="color:var(--text-light)">Geen meldingen nog</p>';
-  } catch (err) { console.error(err); }
-}
-
-// ── Meetings ──
-async function loadMeetings() {
-  try {
-    const today = await api('/api/meetings/today');
-    document.getElementById('today-meetings').innerHTML = today.length
-      ? today.map(renderMeeting).join('')
-      : '<p style="color:var(--text-light)">Geen vergaderingen vandaag</p>';
-
-    const upcoming = await api('/api/meetings/upcoming');
-    let currentDate = '';
-    let html = '';
-    for (const m of upcoming) {
-      if (m.datum !== currentDate) {
-        currentDate = m.datum;
-        const d = new Date(m.datum);
-        const dag = ['zo','ma','di','wo','do','vr','za'][d.getDay()];
-        html += `<h3 style="margin:20px 0 10px;color:var(--text-light);font-size:13px;">${dag} ${m.datum}</h3>`;
-      }
-      html += renderMeeting(m);
-    }
-    document.getElementById('upcoming-meetings').innerHTML = html || '<p style="color:var(--text-light)">Geen geplande vergaderingen</p>';
-  } catch (err) { console.error(err); }
-}
-
-function renderMeeting(m) {
-  const statusBadge = m.status === 'live'
-    ? '<span class="badge badge-live">LIVE</span>'
-    : m.has_livestream
-      ? '<span class="badge badge-stream">STREAM</span>'
-      : '<span class="badge badge-scheduled">GEPLAND</span>';
-  return `
-    <div class="meeting-item" onclick="openTranscript(${m.id}, '${escHtml(m.gemeente)}', '${escHtml(m.url || '')}')">
-      <div class="meeting-time">${m.tijd || '??:??'}</div>
-      <div class="meeting-info">
-        <div class="gemeente">${escHtml(m.gemeente)} ${statusBadge}</div>
-        <div class="titel">${escHtml(m.titel || '')}</div>
-        ${m.url ? `<div class="url"><a href="${escHtml(m.url)}" target="_blank" onclick="event.stopPropagation()">Bekijk live</a></div>` : ''}
-      </div>
-    </div>
-  `;
-}
-
-// ── Alerts ──
-async function loadAlerts() {
-  try {
-    const alerts = await api('/api/alerts?limit=100');
-    document.getElementById('alerts-list').innerHTML = alerts.length
-      ? alerts.map(renderAlert).join('')
-      : '<p style="color:var(--text-light)">Geen meldingen. Stel uw voorkeuren in en start een demo-vergadering.</p>';
-  } catch (err) { console.error(err); }
-}
-
-function renderAlert(a) {
-  const isUnread = !a.read;
-  const isPers = a.level === 'pers';
-  const topicLabel = allTopics[a.topic] || a.topic || 'Melding';
-  const levelLabel = isPers ? '📰 Nieuwsredactie' : '🏛️ Bestuurlijk';
-  const levelBadge = isPers ? 'badge-pers' : 'badge-bestuurlijk';
-  return `
-    <div class="alert-item ${isUnread ? 'unread' : ''}" onclick="clickAlert(${a.id}, ${a.meeting_id})">
-      <div style="flex:1">
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
-          <span class="badge ${levelBadge}">${levelLabel}</span>
-          <span style="font-size:12px;color:var(--text-light)">${topicLabel}</span>
-        </div>
-        <div class="alert-title">${escHtml(a.title || '')}</div>
-        <div class="alert-summary">${escHtml(a.summary || '')}</div>
-        <div style="display:flex;gap:12px;align-items:center;margin-top:8px;">
-          <span class="alert-time">${a.created_at || ''}</span>
-          ${a.meeting_id ? `<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openTranscript(${a.meeting_id}, '${escHtml(a.gemeente || '')}', '${escHtml(a.livestream_url || '')}')">
-            📝 Transcript
-          </button>` : ''}
-          ${a.livestream_url ? `<a class="btn btn-outline btn-sm" href="${escHtml(a.livestream_url)}" target="_blank" onclick="event.stopPropagation()">
-            📺 Livestream
-          </a>` : ''}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-async function clickAlert(alertId, meetingId) {
-  try {
-    await api(`/api/alerts/${alertId}/read`, { method: 'POST' });
-  } catch {}
-  if (meetingId) openTranscript(meetingId);
-  else navigate('alerts');
-}
-
-// ── Transcript ──
-function openTranscript(meetingId, gemeente, url) {
-  currentMeetingId = meetingId;
-  lastTranscriptTime = 0;
-  document.getElementById('transcript-title').textContent = gemeente || 'Transcript';
-  document.getElementById('transcript-subtitle').textContent = 'Meeting #' + meetingId;
-  if (url) {
-    const link = document.getElementById('transcript-stream-link');
-    link.href = url;
-    link.classList.remove('hidden');
-  }
-  navigate('transcript');
-  loadTranscript();
-}
-
-async function loadTranscript() {
-  if (!currentMeetingId) return;
-  try {
-    const chunks = await api(`/api/transcript/${currentMeetingId}?since=${lastTranscriptTime}`);
-    const container = document.getElementById('transcript-chunks');
-    if (chunks.length > 0 && lastTranscriptTime === 0) container.innerHTML = '';
-
-    for (const c of chunks) {
-      const div = document.createElement('div');
-      div.className = 'chunk';
-      div.innerHTML = `
-        <span class="time">${formatTime(c.start_time)}</span>
-        <div class="speaker">${escHtml(c.speaker || 'Spreker')}</div>
-        <div class="text">${escHtml(c.text)}</div>
-      `;
-      container.appendChild(div);
-      if (c.end_time > lastTranscriptTime) lastTranscriptTime = c.end_time;
-    }
-    if (chunks.length > 0) container.scrollTop = container.scrollHeight;
-  } catch (err) { console.error(err); }
-}
-
-function formatTime(seconds) {
-  if (!seconds && seconds !== 0) return '';
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-// ── Preferences ──
-function renderTopics() {
-  const grid = document.getElementById('topics-grid');
-  const levels = ['geen', 'bestuurlijk', 'pers'];
-  const labels = { geen: 'Geen', bestuurlijk: 'Bestuurlijk', pers: 'Nieuwsredactie' };
-  grid.innerHTML = Object.entries(allTopics).map(([id, name]) => {
-    const current = prefs.topics[id] || 'geen';
+  list.innerHTML = articles.map(a => {
+    const isUpdate = (a.title || '').startsWith('Update:');
     return `
-      <div class="topic-row">
-        <div class="topic-name">${name}</div>
-        <div class="level-selector">
-          ${levels.map(lvl =>
-            `<button class="level-btn ${current === lvl ? 'active-' + lvl : ''}" 
-                     onclick="setTopicLevel('${id}', '${lvl}', this)">${labels[lvl]}</button>`
-          ).join('')}
-        </div>
+    <div class="article-card level-${a.level}${isUpdate?' is-update':''}" data-id="${a.id}">
+      <div class="card-meta">
+        ${isUpdate ? '<span class="badge badge-update">Update</span>' : ''}
+        ${levelBadge(a.level)}
+        <span class="badge badge-topic">${topicName(a.topic)}</span>
+        <span class="card-gemeente">${a.gemeente || ''}</span>
+        <span class="card-time">${fmt_time(a.created_at)} · ${fmt_date(a.created_at)}</span>
       </div>
-    `;
+      <div class="card-title">${escHtml(a.title || '')}</div>
+      <div class="card-body collapsed">${escHtml(a.body || '')}</div>
+      <button class="card-expand">Meer lezen ↓</button>
+    </div>`;
   }).join('');
-}
 
-function setTopicLevel(topicId, level, btn) {
-  prefs.topics[topicId] = level;
-  // Update button styling
-  const row = btn.closest('.level-selector');
-  row.querySelectorAll('.level-btn').forEach(b => {
-    b.className = 'level-btn';
-  });
-  btn.classList.add('active-' + level);
-}
-
-function renderGemeentenTags() {
-  document.getElementById('gemeente-tags').innerHTML = prefs.gemeenten.map(g =>
-    `<span class="gemeente-tag">${escHtml(g)} <span class="remove" onclick="removeGemeente('${escHtml(g)}')">&times;</span></span>`
-  ).join('');
-}
-
-function filterGemeenten() {
-  const q = document.getElementById('gemeente-input').value.toLowerCase();
-  const dd = document.getElementById('gemeente-dropdown');
-  if (q.length < 1) { dd.classList.remove('open'); return; }
-  const matches = allGemeenten.filter(g =>
-    g.toLowerCase().includes(q) && !prefs.gemeenten.includes(g)
-  ).slice(0, 10);
-  dd.innerHTML = matches.map(g =>
-    `<div onclick="addGemeente('${escHtml(g)}')">${escHtml(g)}</div>`
-  ).join('');
-  dd.classList.toggle('open', matches.length > 0);
-}
-
-function showGemeenteDropdown() { filterGemeenten(); }
-
-function addGemeente(name) {
-  if (!prefs.gemeenten.includes(name)) prefs.gemeenten.push(name);
-  document.getElementById('gemeente-input').value = '';
-  document.getElementById('gemeente-dropdown').classList.remove('open');
-  renderGemeentenTags();
-}
-
-function removeGemeente(name) {
-  prefs.gemeenten = prefs.gemeenten.filter(g => g !== name);
-  renderGemeentenTags();
-}
-
-async function savePreferences() {
-  try {
-    await api('/api/preferences', {
-      method: 'PUT',
-      body: JSON.stringify({ topics: prefs.topics, gemeenten: prefs.gemeenten }),
-    });
-    showToast('Voorkeuren opgeslagen', 'Uw meldingen worden nu gefilterd op uw selectie.', 'sector');
-  } catch (err) {
-    showToast('Fout', err.message, 'news');
-  }
-}
-
-// ── Demo ──
-async function startDemo() {
-  try {
-    const res = await api('/api/demo/start', { method: 'POST' });
-    currentMeetingId = res.meeting_id;
-    lastTranscriptTime = 0;
-    showToast('Demo gestart', `Vergadering ${res.gemeente} — transcript verschijnt live`, 'sector');
-
-    document.getElementById('transcript-title').textContent = res.gemeente;
-    document.getElementById('transcript-subtitle').textContent = 'Demo vergadering';
-    document.getElementById('transcript-chunks').innerHTML = '';
-    navigate('transcript');
-
-    // Poll transcript elke 2 seconden
-    if (transcriptPollInterval) clearInterval(transcriptPollInterval);
-    transcriptPollInterval = setInterval(loadTranscript, 2000);
-  } catch (err) {
-    showToast('Fout', err.message, 'news');
-  }
-}
-
-// ── SSE ──
-function connectSSE() {
-  if (eventSource) eventSource.close();
-  if (!token) return;
-
-  eventSource = new EventSource('/api/alerts/stream?token=' + encodeURIComponent(token));
-
-  eventSource.onmessage = function(e) {
-    try {
-      const data = JSON.parse(e.data);
-      if (data.type_event === 'alert') {
-        const isPers = data.level === 'pers';
-        showToast(
-          data.title || 'Melding',
-          data.summary || data.quote || '',
-          isPers ? 'news' : 'sector',
-          data.meeting_id,
-          data.livestream_url
-        );
-        loadAlerts();
-        loadDashboard();
-      }
-    } catch {}
-  };
-
-  eventSource.onerror = function() {
-    // Fallback: poll for alerts
-    eventSource.close();
-    eventSource = null;
-  };
-
-  // Also poll as backup
-  setInterval(async () => {
-    try {
-      const alerts = await api('/api/alerts?unread=true&limit=5');
-      const countEl = document.getElementById('alert-count');
-      if (alerts.length > 0) {
-        countEl.textContent = alerts.length;
-        countEl.classList.remove('hidden');
+  list.querySelectorAll('.card-expand').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const body = btn.previousElementSibling;
+      if (body.classList.contains('collapsed')) {
+        body.classList.remove('collapsed');
+        btn.textContent = 'Minder ↑';
       } else {
-        countEl.classList.add('hidden');
+        body.classList.add('collapsed');
+        btn.textContent = 'Meer lezen ↓';
       }
-    } catch {}
-  }, 5000);
-}
-
-// ── Toast ──
-function showToast(title, text, type, meetingId, livestreamUrl) {
-  const container = document.getElementById('toast-container');
-  const toast = document.createElement('div');
-  toast.className = 'toast' + (type === 'news' ? ' news' : '');
-  const badge = type === 'news' ? '📰 Nieuwsredactie' : '🏛️ Bestuurlijk';
-  let buttons = '';
-  if (meetingId) {
-    buttons += `<button class="btn btn-outline btn-sm" style="margin-top:8px;margin-right:6px;" 
-      onclick="event.stopPropagation();openTranscript(${meetingId})">📝 Transcript</button>`;
-  }
-  if (livestreamUrl) {
-    buttons += `<a class="btn btn-outline btn-sm" style="margin-top:8px;" 
-      href="${escHtml(livestreamUrl)}" target="_blank" onclick="event.stopPropagation()">📺 Live</a>`;
-  }
-  toast.innerHTML = `
-    <div class="toast-badge">${badge}</div>
-    <div class="toast-title">${escHtml(title)}</div>
-    <div class="toast-text">${escHtml(text.substring(0, 200))}${text.length > 200 ? '...' : ''}</div>
-    ${buttons}
-  `;
-  toast.onclick = () => {
-    navigate('alerts');
-    toast.remove();
-  };
-  container.appendChild(toast);
-  setTimeout(() => toast.remove(), 12000);
-
-  // Browser notification
-  if (Notification.permission === 'granted') {
-    new Notification(title, { body: text.substring(0, 120), icon: '/static/icon-192.png' });
-  }
-}
-
-// ── Transcript search ──
-function searchTranscript() {
-  const query = document.getElementById('transcript-search').value.toLowerCase();
-  const chunks = document.querySelectorAll('#transcript-chunks .chunk');
-  chunks.forEach(chunk => {
-    const text = chunk.querySelector('.text')?.textContent?.toLowerCase() || '';
-    const speaker = chunk.querySelector('.speaker')?.textContent?.toLowerCase() || '';
-    if (!query || text.includes(query) || speaker.includes(query)) {
-      chunk.style.display = '';
-      chunk.classList.remove('highlighted');
-      if (query && (text.includes(query) || speaker.includes(query))) {
-        chunk.classList.add('highlighted');
-      }
-    } else {
-      chunk.style.display = 'none';
-    }
+    });
   });
 }
 
 function escHtml(s) {
-  if (!s) return '';
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// ── Init ──
-document.addEventListener('DOMContentLoaded', async () => {
-  // Request notification permission
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission();
-  }
+function prependArticle(art) {
+  S.articles.unshift(art);
+  if (!articleMatchesPrefs(art)) return;
+  if (S.feedFilter !== 'alle' && S.feedFilter !== art.level) return;
 
-  // Register service worker
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  }
+  const list = document.getElementById('articles-list');
+  // Remove empty state if present
+  const empty = list.querySelector('.feed-empty');
+  if (empty) empty.remove();
 
-  // Close gemeente dropdown on outside click
-  document.addEventListener('click', e => {
-    if (!e.target.closest('.gemeente-search')) {
-      document.getElementById('gemeente-dropdown')?.classList.remove('open');
+  const isUpdate = (art.title || '').startsWith('Update:');
+  const div = document.createElement('div');
+  div.className = `article-card level-${art.level} new-article${isUpdate?' is-update':''}`;
+  div.innerHTML = `
+    <div class="card-meta">
+      ${isUpdate ? '<span class="badge badge-update">Update</span>' : ''}
+      ${levelBadge(art.level)}
+      <span class="badge badge-topic">${topicName(art.topic)}</span>
+      <span class="card-gemeente">${art.gemeente || ''}</span>
+      <span class="card-time">${fmt_time(art.created_at)} · ${fmt_date(art.created_at)}</span>
+    </div>
+    <div class="card-title">${escHtml(art.title || '')}</div>
+    <div class="card-body collapsed">${escHtml(art.body || '')}</div>
+    <button class="card-expand">Meer lezen ↓</button>
+  `;
+  div.querySelector('.card-expand').addEventListener('click', e => {
+    e.stopPropagation();
+    const body = e.target.previousElementSibling;
+    if (body.classList.contains('collapsed')) {
+      body.classList.remove('collapsed');
+      e.target.textContent = 'Minder ↑';
+    } else {
+      body.classList.add('collapsed');
+      e.target.textContent = 'Meer lezen ↓';
     }
   });
+  list.prepend(div);
+}
 
-  // Auto-login if token exists
-  if (token) {
+// ── Popup notificaties ────────────────────────────────────────────────────
+function showPopup(art) {
+  if (!S.prefs.notifications) return;
+  if (!articleMatchesPrefs(art)) return;
+
+  const container = document.getElementById('popup-container');
+  const toast = document.createElement('div');
+  toast.className = `popup-toast level-${art.level}`;
+  toast.innerHTML = `
+    <button class="pt-close">×</button>
+    <div class="pt-meta">
+      ${levelBadge(art.level)}
+      <span class="badge badge-topic">${topicName(art.topic)}</span>
+    </div>
+    <div class="pt-title">${escHtml(art.title || '')}</div>
+    <div class="pt-gemeente">${art.gemeente || ''}</div>
+  `;
+
+  function dismiss() {
+    toast.classList.add('removing');
+    setTimeout(() => toast.remove(), 260);
+  }
+  toast.querySelector('.pt-close').addEventListener('click', dismiss);
+  toast.addEventListener('click', e => {
+    if (e.target.classList.contains('pt-close')) return;
+    // Switch to feed and scroll to article
+    document.querySelector('[data-view="nieuws"]').click();
+    dismiss();
+    setTimeout(() => {
+      const el = document.querySelector(`[data-id="${art.id}"]`);
+      if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
+    }, 100);
+  });
+
+  // Max 3 popups
+  while (container.children.length >= 3) {
+    container.lastChild.remove();
+  }
+  container.prepend(toast);
+  setTimeout(dismiss, 8000);
+}
+
+// ── SSE verbinding ────────────────────────────────────────────────────────
+function connectSSE() {
+  const dot = document.getElementById('connection-dot');
+  const es = new EventSource('/api/articles/stream');
+
+  es.onopen = () => dot.className = 'connected';
+  es.onerror = () => {
+    dot.className = 'error';
+    setTimeout(connectSSE, 5000);
+    es.close();
+  };
+  es.onmessage = e => {
     try {
-      await enterApp();
-    } catch {
-      doLogout();
+      const data = JSON.parse(e.data);
+      if (data.type === 'article') {
+        prependArticle(data);
+        showPopup(data);
+      }
+    } catch(err) {}
+  };
+}
+
+// ── Artikelen ophalen ─────────────────────────────────────────────────────
+async function loadArticles() {
+  const gem = S.prefs.gemeenten;
+  let url = '/api/articles?limit=200';
+  if (gem.length > 0) url += '&gemeenten=' + encodeURIComponent(gem.join(','));
+  try {
+    const res = await fetch(url);
+    S.articles = await res.json();
+    renderFeed();
+  } catch(e) { console.error('Artikelen laden mislukt', e); }
+}
+
+// ── Live meetings sidebar ─────────────────────────────────────────────────
+let sidebarDateOffset = 0;
+
+function sidebarDateStr(offset) {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return d.toISOString().slice(0, 10);
+}
+
+function sidebarDateLabel(offset) {
+  if (offset === 0) return 'Vandaag';
+  if (offset === -1) return 'Gisteren';
+  if (offset === 1) return 'Morgen';
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return d.toLocaleDateString('nl-NL', {weekday:'short', day:'numeric', month:'short'});
+}
+
+function shiftSidebarDate(delta) {
+  sidebarDateOffset += delta;
+  document.getElementById('sidebar-date-label').textContent = sidebarDateLabel(sidebarDateOffset);
+  loadLiveMeetings();
+}
+
+async function loadLiveMeetings() {
+  try {
+    const gem = S.prefs.gemeenten || [];
+    const date = sidebarDateStr(sidebarDateOffset);
+    const url = gem.length > 0
+      ? `/api/meetings/today?date=${date}&gemeenten=` + encodeURIComponent(gem.join(','))
+      : `/api/meetings/today?date=${date}`;
+    const res = await fetch(url);
+    const meetings = await res.json();
+    const list = document.getElementById('live-list');
+    if (meetings.length === 0) {
+      const lbl = sidebarDateLabel(sidebarDateOffset).toLowerCase();
+      list.innerHTML = `<div class="live-empty">Geen vergaderingen ${lbl}</div>`;
+      return;
+    }
+    list.innerHTML = meetings.map(m => {
+      const isLive = m.status === 'live';
+      const isEnded = m.status === 'ended' || m.status === 'afgelopen';
+      const hasStream = m.has_livestream;
+      const noStream = !hasStream;
+      let badge = '';
+      if (isLive) badge = '<span class="li-badge-live">LIVE</span>';
+      else if (noStream) badge = '<span class="li-badge-no-stream">Geen camera</span>';
+      const streamUrl = m.stream_url || m.url || '';
+      const terugkijkLink = isEnded && hasStream && streamUrl
+        ? `<a class="li-terugkijk" href="${escHtml(streamUrl)}" target="_blank" onclick="event.stopPropagation()">Terugkijken →</a>`
+        : '';
+      const raadsledenHtml = !noStream ? `
+        <div class="li-raadsleden">
+          <div class="li-raadsleden-label">Raadsleden</div>
+          <div id="raadsleden-${m.id}">
+            <div class="li-raadslid" style="color:#aaa">Laden...</div>
+          </div>
+        </div>` : '';
+      return `
+        <div class="live-item${noStream ? ' no-stream' : ''}${isEnded ? ' is-ended' : ''}" data-mid="${m.id}" onclick="toggleMeetingExpand(this)">
+          <div class="li-time">${badge}${m.tijd || ''}<span class="li-expand-arrow">›</span></div>
+          <div class="li-gemeente">${m.gemeente}</div>
+          <div class="li-title">${escHtml(m.titel || '')}</div>
+          ${terugkijkLink}
+          ${raadsledenHtml}
+        </div>`;
+    }).join('');
+
+    // Raadsleden worden lazy geladen bij klik op de kaart
+  } catch(e) {}
+}
+
+function toggleMeetingExpand(card) {
+  const wasExpanded = card.classList.contains('expanded');
+  // Sluit alle andere open kaarten
+  document.querySelectorAll('.live-item.expanded').forEach(c => c.classList.remove('expanded'));
+  if (!wasExpanded) {
+    card.classList.add('expanded');
+    // Laad raadsleden als nog niet geladen
+    const mid = card.dataset.mid;
+    const list = document.getElementById('raadsleden-' + mid);
+    if (list && list.querySelector('.li-raadslid') &&
+        list.querySelector('.li-raadslid').textContent === 'Laden...') {
+      loadRaadsleden(mid);
     }
   }
-});
+}
+
+async function loadRaadsleden(meetingId) {
+  const el = document.getElementById('raadsleden-' + meetingId);
+  if (!el) return;
+  try {
+    const res = await fetch('/api/meetings/' + meetingId + '/platform-details');
+    const data = await res.json();
+    const speakers = data.speakers || [];
+    const collapseHtml = `<button class="li-collapse-btn" onclick="event.stopPropagation();toggleMeetingExpand(this.closest('.live-item'))">Inklappen ↑</button>`;
+    if (speakers.length === 0) {
+      el.innerHTML = '<div class="li-raadslid" style="color:#aaa">Geen gegevens</div>' + collapseHtml;
+      return;
+    }
+    const PREVIEW = 3;
+    const makeRow = s =>
+      `<div class="li-raadslid">${escHtml(s.name)}${s.party ? ` <span class="li-party">(${escHtml(s.party)})</span>` : ''}</div>`;
+    const previewHtml = speakers.slice(0, PREVIEW).map(makeRow).join('');
+    const restHtml   = speakers.slice(PREVIEW).map(makeRow).join('');
+    const collapseBtn = `<button class="li-collapse-btn" onclick="event.stopPropagation();toggleMeetingExpand(this.closest('.live-item'))">Inklappen ↑</button>`;
+    el.innerHTML = previewHtml + (restHtml ? `
+      <div class="li-rest" style="display:none">${restHtml}</div>
+      <button class="li-showall-btn" onclick="event.stopPropagation();toggleRestRaadsleden(this)">
+        ▸ Nog ${speakers.length - PREVIEW} raadsleden
+      </button>` : '') + collapseBtn;
+  } catch(e) {
+    el.innerHTML = '<div class="li-raadslid" style="color:#aaa">Fout bij laden</div>';
+  }
+}
+
+function toggleRestRaadsleden(btn) {
+  const rest = btn.previousElementSibling;
+  const open = rest.style.display === 'none';
+  rest.style.display = open ? 'block' : 'none';
+  btn.textContent = open ? '▾ Minder' : `▸ Nog ${rest.querySelectorAll('.li-raadslid').length} raadsleden`;
+}
+
+// ── Kalender ──────────────────────────────────────────────────────────────
+const DAY_NAMES = ['Ma','Di','Wo','Do','Vr','Za','Zo'];
+const MONTH_NAMES = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+
+function getWeekDates(offset) {
+  const now = new Date();
+  const day = now.getDay(); // 0=sun
+  const mon = new Date(now);
+  mon.setDate(now.getDate() - ((day === 0 ? 7 : day) - 1) + offset * 7);
+  return Array.from({length:7}, (_, i) => {
+    const d = new Date(mon);
+    d.setDate(mon.getDate() + i);
+    return d;
+  });
+}
+
+function toYMD(d) {
+  return d.toISOString().slice(0,10);
+}
+
+async function renderCalendar() {
+  const grid = document.getElementById('cal-grid');
+  const label = document.getElementById('cal-week-label');
+  const dates = getWeekDates(S.calOffset);
+
+  const start = toYMD(dates[0]);
+  const end = toYMD(dates[6]);
+  label.textContent = `${dates[0].getDate()} ${MONTH_NAMES[dates[0].getMonth()]} — ${dates[6].getDate()} ${MONTH_NAMES[dates[6].getMonth()]} ${dates[6].getFullYear()}`;
+
+  // Fetch meetings
+  let meetings = {};
+  const gem = S.prefs.gemeenten;
+  let url = `/api/meetings/calendar?start=${start}&end=${end}`;
+  if (gem.length > 0) url += '&gemeenten=' + encodeURIComponent(gem.join(','));
+
+  try {
+    const res = await fetch(url);
+    meetings = await res.json();
+  } catch(e) {}
+
+  const today = toYMD(new Date());
+
+  if (gem.length === 0) {
+    grid.innerHTML = '';
+    grid.insertAdjacentHTML('beforeend', '<div style="grid-column:1/-1"><div class="no-gemeente-msg">Selecteer gemeenten in <strong>Instellingen</strong> om vergaderingen te zien.</div></div>');
+    return;
+  }
+
+  grid.innerHTML = dates.map((d, i) => {
+    const ymd = toYMD(d);
+    const isToday = ymd === today;
+    const dayMeetings = meetings[ymd] || [];
+
+    const meetingsHtml = dayMeetings.map(m => {
+      const isLive = m.status === 'live';
+      const hasStream = m.has_livestream;
+      let cls = 'cal-meeting';
+      if (isLive) cls += ' is-live';
+      else if (hasStream) cls += ' has-stream';
+      return `<div class="${cls}" title="${escHtml(m.titel||'')}">
+        <span class="cm-time">${(m.tijd||'').slice(0,5)}</span>
+        <span class="cm-gem"> · ${escHtml(m.gemeente)}</span>
+        <span class="cm-title">${escHtml((m.titel||'').slice(0,40))}${m.titel&&m.titel.length>40?'…':''}</span>
+      </div>`;
+    }).join('');
+
+    return `<div class="cal-day${isToday?' today':''}">
+      <div class="cal-day-header">${DAY_NAMES[i]}</div>
+      <div class="cal-day-num">${d.getDate()}</div>
+      ${meetingsHtml || '<div style="font-size:11px;color:var(--text-light)">—</div>'}
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('cal-prev').addEventListener('click', () => { S.calOffset--; renderCalendar(); });
+document.getElementById('cal-next').addEventListener('click', () => { S.calOffset++; renderCalendar(); });
+document.getElementById('cal-today').addEventListener('click', () => { S.calOffset = 0; renderCalendar(); });
+
+// ── Instellingen ──────────────────────────────────────────────────────────
+async function renderSettings() {
+  // Topics
+  if (!window._topics) return;
+  const topicsList = document.getElementById('topics-list');
+  topicsList.innerHTML = Object.entries(window._topics).map(([id, name]) => {
+    const current = S.prefs.topics[id] || 'geen';
+    const opts = [
+      ['geen', 'Geen'],
+      ['pers', 'ANP'],
+      ['bestuurlijk', 'Bestuurlijk'],
+      ['beide', 'Beide'],
+    ];
+    const btns = opts.map(([val, label]) =>
+      `<button class="level-btn${current===val?' active-'+val:''}" data-topic="${id}" data-val="${val}">${label}</button>`
+    ).join('');
+    return `<div class="topic-row">
+      <span class="topic-name">${name}</span>
+      <div class="level-btns">${btns}</div>
+    </div>`;
+  }).join('');
+
+  topicsList.querySelectorAll('.level-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const topic = btn.dataset.topic;
+      const val = btn.dataset.val;
+      S.prefs.topics[topic] = val;
+      savePrefs();
+      // Update button states in this row
+      btn.closest('.level-btns').querySelectorAll('.level-btn').forEach(b => {
+        b.className = 'level-btn' + (b.dataset.val === val ? ' active-' + val : '');
+      });
+      renderFeed();
+    });
+  });
+
+  // Provincies
+  if (!window._provinces) return;
+  const provList = document.getElementById('province-list');
+  provList.innerHTML = Object.entries(window._provinces).map(([prov, gems]) => {
+    const selected = gems.filter(g => S.prefs.gemeenten.includes(g));
+    const chips = gems.map(g =>
+      `<button class="gem-chip${S.prefs.gemeenten.includes(g)?' selected':''}" data-gem="${g}">${g}</button>`
+    ).join('');
+    return `<div class="province-item">
+      <div class="province-header">
+        <span class="p-name">${prov}</span>
+        <span class="p-count">${selected.length}/${gems.length}</span>
+        <span class="p-arrow">▼</span>
+      </div>
+      <div class="gemeente-grid">${chips}</div>
+    </div>`;
+  }).join('');
+
+  // Pijl: alleen uitklappen
+  provList.querySelectorAll('.p-arrow').forEach(arrow => {
+    arrow.addEventListener('click', e => {
+      e.stopPropagation();
+      arrow.closest('.province-item').classList.toggle('open');
+    });
+  });
+
+  // Naam + count: alle gemeentes selecteren/deselecteren zonder uitklappen
+  provList.querySelectorAll('.p-name, .p-count').forEach(el => {
+    el.addEventListener('click', () => {
+      const item = el.closest('.province-item');
+      const chips = Array.from(item.querySelectorAll('.gem-chip'));
+      const gems = chips.map(c => c.dataset.gem);
+      const allSelected = gems.every(g => S.prefs.gemeenten.includes(g));
+      if (allSelected) {
+        S.prefs.gemeenten = S.prefs.gemeenten.filter(g => !gems.includes(g));
+        chips.forEach(c => c.classList.remove('selected'));
+        item.classList.remove('prov-selected');
+      } else {
+        gems.forEach(g => { if (!S.prefs.gemeenten.includes(g)) S.prefs.gemeenten.push(g); });
+        chips.forEach(c => c.classList.add('selected'));
+        item.classList.add('prov-selected');
+      }
+      item.querySelector('.p-count').textContent = `${item.querySelectorAll('.gem-chip.selected').length}/${chips.length}`;
+      savePrefs();
+      renderFeed();
+    });
+  });
+
+  // Individuele gemeente chips
+  provList.querySelectorAll('.gem-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const gem = chip.dataset.gem;
+      if (S.prefs.gemeenten.includes(gem)) {
+        S.prefs.gemeenten = S.prefs.gemeenten.filter(g => g !== gem);
+        chip.classList.remove('selected');
+      } else {
+        S.prefs.gemeenten.push(gem);
+        chip.classList.add('selected');
+      }
+      const item = chip.closest('.province-item');
+      const chips = Array.from(item.querySelectorAll('.gem-chip'));
+      const sel = chips.filter(c => c.classList.contains('selected')).length;
+      item.querySelector('.p-count').textContent = `${sel}/${chips.length}`;
+      item.classList.toggle('prov-selected', sel === chips.length);
+      savePrefs();
+      renderFeed();
+    });
+  });
+
+  // Markeer provincies die volledig geselecteerd zijn bij laden
+  provList.querySelectorAll('.province-item').forEach(item => {
+    const chips = Array.from(item.querySelectorAll('.gem-chip'));
+    if (chips.length && chips.every(c => c.classList.contains('selected'))) {
+      item.classList.add('prov-selected');
+    }
+  });
+}
+
+// ── Bronnen (URL-beheer) ───────────────────────────────────────────────────
+let _bronnenData = [];
+
+async function loadBronnen() {
+  if (_bronnenData.length) return;  // al geladen
+  try {
+    const res = await fetch('/api/gemeenten/urls');
+    _bronnenData = await res.json();
+  } catch(e) { console.error('Bronnen laden mislukt', e); return; }
+  renderBronnen(_bronnenData);
+}
+
+function filterBronnen() {
+  const q = document.getElementById('bronnen-search').value.toLowerCase();
+  const filtered = q ? _bronnenData.filter(g => g.naam.toLowerCase().includes(q)) : _bronnenData;
+  renderBronnen(filtered);
+}
+
+function renderBronnen(data) {
+  const tbody = document.getElementById('bronnen-tbody');
+  const stat = document.getElementById('bronnen-stat');
+  const metUrl = data.filter(g => g.go_url).length;
+  stat.textContent = `${metUrl} van ${data.length} gemeenten hebben een URL`;
+
+  tbody.innerHTML = data.map(g => {
+    const platforms = JSON.parse(g.platforms || '[]');
+    const badges = platforms.map(p =>
+      `<span class="bron-platform-badge ${escHtml(p)}">${escHtml(p)}</span>`
+    ).join('');
+    const naam = escHtml(g.naam);
+    return `<tr data-naam="${naam}">
+      <td class="bron-naam">${naam}</td>
+      <td><div class="bron-platforms">${badges}</div></td>
+      <td class="bron-url-cell">
+        <div class="bron-url-display" id="disp-go-${naam}">
+          ${g.go_url
+            ? `<a class="bron-url-link" href="${escHtml(g.go_url)}" target="_blank" title="${escHtml(g.go_url)}">${escHtml(g.go_url)}</a>`
+            : `<span class="bron-url-empty">— niet ingesteld —</span>`}
+          <button class="bron-edit-btn" onclick="startEdit('go_url','${naam}')" title="Bewerken">✏️</button>
+        </div>
+        <div class="bron-url-edit" id="edit-go-${naam}">
+          <input class="bron-url-input" id="inp-go-${naam}" type="url" value="${escHtml(g.go_url || '')}" placeholder="https://raad.gemeente.nl">
+          <button class="bron-save-btn" onclick="saveUrl('go_url','${naam}')">Opslaan</button>
+          <button class="bron-cancel-btn" onclick="cancelEdit('go_url','${naam}')">Annuleren</button>
+        </div>
+      </td>
+      <td>
+        ${g.website ? `<a class="bron-url-link" href="${escHtml(g.website)}" target="_blank">${escHtml(g.website)}</a>` : '<span class="bron-url-empty">—</span>'}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function startEdit(field, naam) {
+  document.getElementById(`disp-${field === 'go_url' ? 'go' : 'ws'}-${naam}`).style.display = 'none';
+  document.getElementById(`edit-${field === 'go_url' ? 'go' : 'ws'}-${naam}`).classList.add('active');
+  document.getElementById(`inp-${field === 'go_url' ? 'go' : 'ws'}-${naam}`).focus();
+}
+
+function cancelEdit(field, naam) {
+  const pfx = field === 'go_url' ? 'go' : 'ws';
+  document.getElementById(`disp-${pfx}-${naam}`).style.display = '';
+  document.getElementById(`edit-${pfx}-${naam}`).classList.remove('active');
+}
+
+async function saveUrl(field, naam) {
+  const pfx = field === 'go_url' ? 'go' : 'ws';
+  const val = document.getElementById(`inp-${pfx}-${naam}`).value.trim();
+  try {
+    const res = await fetch(`/api/gemeente/${encodeURIComponent(naam)}/url`, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({[field]: val || null}),
+    });
+    if (!res.ok) throw new Error(await res.text());
+  } catch(e) { alert('Opslaan mislukt: ' + e.message); return; }
+  // Update lokale data en her-render rij
+  const g = _bronnenData.find(x => x.naam === naam);
+  if (g) g[field] = val || null;
+  filterBronnen();
+}
+
+// Laad bronnen zodra tab geopend wordt
+document.querySelector('[data-view="bronnen"]').addEventListener('click', loadBronnen);
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────
+async function init() {
+  loadPrefs();
+  updateNotifUI();
+
+  // Laad topics en provincies
+  try {
+    const [tRes, pRes] = await Promise.all([
+      fetch('/api/topics'),
+      fetch('/api/provinces'),
+    ]);
+    const tData = await tRes.json();
+    const pData = await pRes.json();
+    window._topics = tData.topics;
+    window._provinces = pData;
+  } catch(e) { console.error('Init data laden mislukt', e); }
+
+  await Promise.all([loadArticles(), loadLiveMeetings()]);
+  connectSSE();
+
+  // Ververs live meetings elke minuut
+  setInterval(loadLiveMeetings, 60000);
+}
+
+init();
 </script>
 </body>
 </html>

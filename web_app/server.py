@@ -1638,13 +1638,19 @@ async def _detect_livestream_flags():
         )
         for r, html in zip(batch, results):
             if isinstance(html, str) and _page_has_stream_embed(html):
-                c = _meetings_conn()
-                if c:
-                    c.execute("UPDATE meetings SET has_livestream=1 WHERE id=?", (r['id'],))
-                    c.commit()
-                    c.close()
-                    found += 1
-        await asyncio.sleep(1)  # even ademen tussen batches
+                def _write_flag(rid=r['id']):
+                    try:
+                        c = _meetings_conn()
+                        if c:
+                            c.execute("UPDATE meetings SET has_livestream=1 WHERE id=?", (rid,))
+                            c.commit()
+                            c.close()
+                    except Exception:
+                        pass
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, _write_flag)
+                found += 1
+        await asyncio.sleep(2)  # ruimte voor andere taken tussen batches
 
     print(f'[livestream_detect] klaar — {found} nieuwe streams gevonden')
 
@@ -1709,9 +1715,10 @@ async def _do_stream_check():
     """Check live-status van alle vergaderingen van vandaag.
 
     Tijdvenster per meeting:
-      - 5 min vóór starttijd  → begin pingen (elke minuut via watcher)
+      - 10 min vóór starttijd → begin pingen
       - tot 2 uur ná starttijd → detecteer live-start
-      - al live: controleer of stream nog actief is (finish na 6 uur)
+      - al live: controleer of stream nog actief is (auto-finish na 5 uur)
+    Draait elk uur via _livestream_watcher.
     Checkt ALLE meetings met URL, ongeacht has_livestream-vlag.
     """
     conn = _meetings_conn()
@@ -1815,8 +1822,8 @@ async def _do_stream_check():
         datum = m['datum'] if len(m) > 3 else today
         if datum == yesterday:
             start_min -= 1440
-        # Tijdvenster: 5 min voor start tot 2 uur na start
-        if start_min - 5 <= now_min <= start_min + 120:
+        # Tijdvenster: 10 min voor start tot 2 uur na start
+        if start_min - 10 <= now_min <= start_min + 120:
             check_tasks.append((m['id'], url))
 
     async def _check_one(mid, url):
@@ -1831,15 +1838,17 @@ async def _do_stream_check():
 
 
 async def _livestream_watcher():
-    """Achtergrond-task: ping streams elke minuut."""
-    # Directe startup-scan: check meetings die tot 2 uur geleden gestart zijn
+    """Achtergrond-task: ping streams elk uur.
+    Tijdvenster: 10 min voor start t/m 2 uur na start.
+    """
+    # Directe startup-scan
     try:
         await _do_stream_check()
     except Exception as e:
         print(f'[stream_watcher] startup-scan: {e}')
 
     while True:
-        await asyncio.sleep(60)
+        await asyncio.sleep(3600)  # elk uur
         try:
             await _do_stream_check()
         except Exception as e:
@@ -2193,6 +2202,48 @@ def get_all_gemeenten():
     rows = conn.execute("SELECT naam, wapen_url FROM gemeenten ORDER BY naam").fetchall()
     conn.close()
     return [{'naam': r[0], 'wapen_url': r[1]} for r in rows]
+
+
+@app.get("/api/gemeenten/urls")
+def get_gemeenten_urls():
+    """Alle gemeenten met hun geconfigureerde URLs en platforms."""
+    conn = _meetings_conn()
+    if conn is None:
+        return []
+    rows = conn.execute(
+        "SELECT naam, platforms, go_url, website, wapen_url FROM gemeenten ORDER BY naam"
+    ).fetchall()
+    conn.close()
+    return [{'naam': r[0], 'platforms': r[1], 'go_url': r[2], 'website': r[3], 'wapen_url': r[4]} for r in rows]
+
+
+class GemeenteUrlUpdate(BaseModel):
+    go_url: Optional[str] = None
+    website: Optional[str] = None
+
+
+@app.put("/api/gemeente/{naam}/url")
+def update_gemeente_url(naam: str, body: GemeenteUrlUpdate):
+    """Sla go_url en/of website op voor een gemeente."""
+    conn = _meetings_conn()
+    if conn is None:
+        raise HTTPException(status_code=503, detail="Database niet beschikbaar")
+    updates, params = [], []
+    if body.go_url is not None:
+        updates.append("go_url = ?"); params.append(body.go_url or None)
+    if body.website is not None:
+        updates.append("website = ?"); params.append(body.website or None)
+    if not updates:
+        raise HTTPException(status_code=400, detail="Niets om bij te werken")
+    params.append(naam)
+    affected = conn.execute(
+        f"UPDATE gemeenten SET {', '.join(updates)} WHERE naam = ?", params
+    ).rowcount
+    conn.commit()
+    conn.close()
+    if affected == 0:
+        raise HTTPException(status_code=404, detail="Gemeente niet gevonden")
+    return {"ok": True}
 
 
 @app.get("/api/gemeente/{naam}/info")
@@ -3337,14 +3388,97 @@ async def trigger_prefetch():
     return {'status': 'gestart'}
 
 
+@app.post("/api/sync/detect-streams")
+async def trigger_detect_streams():
+    """Herdetecteer livestream-vlaggen voor aankomende meetings — URL-scan + platform-heuristiek."""
+    asyncio.create_task(_detect_livestream_flags())
+    asyncio.create_task(_mark_streams_by_platform())
+    return {'status': 'gestart'}
+
+
+async def _mark_streams_by_platform():
+    """Zet has_livestream=1 voor meetings waarvan de gemeente een streaming platform heeft
+    en de meeting-titel past bij een vergadering die live uitgezonden wordt."""
+    import json as _json
+    try:
+        conn = _meetings_conn()
+        if not conn:
+            return
+        today = datetime.now().strftime('%Y-%m-%d')
+        end   = (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d')
+
+        STREAM_KEYWORDS = [
+            'raadsvergadering', 'gemeenteraad', 'commissievergadering',
+            'duidingsdebat', 'duidingsbijeenkomst', 'politieke avond',
+            'besluitvormende', 'beeldvormende', 'oordeelvormende',
+            'raadsavond', 'raadsdebat', 'raadsinformatieavond',
+            'politieke markt', 'raadsbijeenkomst', 'raadsinformatief', 'duidingsgesprek',
+        ]
+        SKIP_KEYWORDS = [
+            'fractievergadering', 'centraal stembureau', 'inauguratie', 'geloofsbrieven',
+            'formulierenmarkt', 'inwerkprogramma', 'presidium', 'raadsledenspreekuur',
+            'agendacommissie', 'afscheidsdiner', 'netwerk', 'publieksacademie',
+            'definitieve uitslag', 'officiële uitslag', 'formele csb', 'welkomstdag raads',
+            'regeldag', 'benoemde raadsleden', 'bezwaarschrift', 'lunch',
+        ]
+        STREAM_PLATFORMS = {'notubiz', 'cwc', 'youtube', 'raadlive', 'iad', 'parlaeus'}
+
+        gem_rows = conn.execute(
+            "SELECT naam, platforms FROM gemeenten WHERE platforms IS NOT NULL AND platforms != ''"
+        ).fetchall()
+        stream_gemeenten = set()
+        for gr in gem_rows:
+            try:
+                platforms = _json.loads(gr['platforms'])
+                if any(p in STREAM_PLATFORMS for p in platforms):
+                    stream_gemeenten.add(gr['naam'])
+            except Exception:
+                pass
+
+        rows = conn.execute("""
+            SELECT m.id, m.titel, g.naam AS gemeente
+            FROM meetings m JOIN gemeenten g ON g.id = m.gemeente_id
+            WHERE m.datum BETWEEN ? AND ?
+              AND m.has_livestream = 0
+              AND m.status IN ('scheduled', 'gemist')
+        """, (today, end)).fetchall()
+
+        updated = 0
+        for r in rows:
+            title_lower = (r['titel'] or '').lower()
+            if any(kw in title_lower for kw in SKIP_KEYWORDS):
+                continue
+            if r['gemeente'] in stream_gemeenten and any(kw in title_lower for kw in STREAM_KEYWORDS):
+                conn.execute("UPDATE meetings SET has_livestream=1 WHERE id=?", (r['id'],))
+                updated += 1
+
+        conn.commit()
+        conn.close()
+        print(f'[mark_streams_by_platform] {updated} meetings bijgewerkt')
+    except Exception as e:
+        print(f'[mark_streams_by_platform] fout (niet fataal): {e}')
+
+
+async def _delayed_start(coro_fn, delay_secs: int):
+    """Start een coroutine pas na delay_secs seconden — voorkomt DB-lock opstapeling bij startup."""
+    await asyncio.sleep(delay_secs)
+    try:
+        await coro_fn()
+    except Exception as e:
+        print(f'[delayed_start:{coro_fn.__name__}] {e}')
+
+
 @app.on_event("startup")
 async def startup_prefetch():
-    asyncio.create_task(_prefetch_upcoming_meetings())
-    asyncio.create_task(_livestream_watcher())
-    asyncio.create_task(_go_sync_watcher())
-    asyncio.create_task(_detect_livestream_flags())
-    asyncio.create_task(_daily_meeting_watcher())
-    asyncio.create_task(_monthly_raadsleden_watcher())
+    # Watchers met kleine vertraging starten zodat de server eerst requests accepteert
+    asyncio.create_task(_delayed_start(_livestream_watcher, 5))
+    asyncio.create_task(_delayed_start(_daily_meeting_watcher, 5))
+    asyncio.create_task(_delayed_start(_monthly_raadsleden_watcher, 5))
+    # Zware eenmalige DB-taken gespreid starten zodat de server requests kan afhandelen
+    asyncio.create_task(_delayed_start(_go_sync_watcher, 10))
+    asyncio.create_task(_delayed_start(_prefetch_upcoming_meetings, 20))
+    asyncio.create_task(_delayed_start(_detect_livestream_flags, 35))
+    asyncio.create_task(_delayed_start(_mark_streams_by_platform, 50))
 
 
 @app.post("/api/meetings/stream-check")
@@ -3387,9 +3521,169 @@ _HUB_STOPWORDS = {
 }
 
 
+# Provincie-aliassen: kortere/alternatieve namen → canonieke naam in PROVINCIE_GEMEENTEN
+_PROV_ALIASES: dict = {
+    'brabant':        'Noord-Brabant',
+    'noord brabant':  'Noord-Brabant',
+    'n brabant':      'Noord-Brabant',
+    'noord holland':  'Noord-Holland',
+    'n holland':      'Noord-Holland',
+    'nh':             'Noord-Holland',
+    'zuid holland':   'Zuid-Holland',
+    'z holland':      'Zuid-Holland',
+    'zh':             'Zuid-Holland',
+    'fryslan':        'Friesland',
+    'fryslân':        'Friesland',
+}
+
+# Regio-namen → lijst van gemeenten binnen die regio
+_REGIO_GEMEENTEN: dict = {
+    'twente': [
+        'Enschede', 'Almelo', 'Hengelo', 'Oldenzaal', 'Haaksbergen',
+        'Borne', 'Losser', 'Tubbergen', 'Dinkelland', 'Wierden',
+        'Hellendoorn', 'Rijssen-Holten', 'Twenterand', 'Hof van Twente',
+    ],
+    'achterhoek': [
+        'Doetinchem', 'Winterswijk', 'Aalten', 'Berkelland', 'Bronckhorst',
+        'Lochem', 'Oost Gelre', 'Oude IJsselstreek',
+    ],
+    'veluwe': [
+        'Harderwijk', 'Nunspeet', 'Elburg', 'Ermelo', 'Putten',
+        'Nijkerk', 'Barneveld', 'Hattem', 'Oldebroek', 'Epe', 'Heerde',
+        'Voorst', 'Brummen', 'Apeldoorn',
+    ],
+    'rivierenland': [
+        'Tiel', 'Culemborg', 'Buren', 'Neder-Betuwe', 'West Betuwe',
+        'Zaltbommel', 'Maasdriel', 'West Maas en Waal',
+    ],
+    'west-brabant': [
+        'Breda', 'Bergen op Zoom', 'Roosendaal', 'Waalwijk', 'Oosterhout',
+        'Etten-Leur', 'Halderberge', 'Rucphen', 'Moerdijk', 'Steenbergen',
+        'Woensdrecht', 'Geertruidenberg', 'Drimmelen', 'Altena',
+        'Gilze en Rijen', 'Goirle', 'Dongen', 'Zundert', 'Baarle-Nassau',
+    ],
+    'food valley': ['Ede', 'Wageningen', 'Barneveld', 'Nijkerk', 'Scherpenzeel', 'Renswoude', 'Rhenen', 'Woudenberg'],
+    'gooi': ['Hilversum', 'Huizen', 'Blaricum', 'Gooise Meren', 'Laren', 'Wijdemeren', 'Eemnes'],
+    'west-friesland': ['Hoorn', 'Enkhuizen', 'Medemblik', 'Hollands Kroon', 'Dijk en Waard', 'Stede Broec', 'Koggenland', 'Opmeer', 'Drechterland'],
+    'kennemerland': ['Haarlem', 'Velsen', 'Beverwijk', 'Heemskerk', 'Uitgeest', 'Bloemendaal', 'Heemstede', 'Zandvoort', 'Castricum'],
+    'alblasserwaard': ['Molenlanden', 'Gorinchem', 'Hardinxveld-Giessendam', 'Alblasserdam', 'Sliedrecht', 'Hendrik-Ido-Ambacht', 'Zwijndrecht', 'Papendrecht'],
+    'drechtsteden': ['Dordrecht', 'Zwijndrecht', 'Sliedrecht', 'Papendrecht', 'Alblasserdam', 'Hendrik-Ido-Ambacht'],
+}
+
+
+# ── Synoniemtabel voor keyword-uitbreiding ───────────────────────────────────
+# Elke ingang mappt op een lijst synoniemen / nauw verwante termen.
+# Bidirectioneel: zowel "azc" → [...] als "asielzoekerscentrum" → [...].
+_HUB_SYNONYMS: dict = {
+    # Asiel / migratie / opvang
+    'azc':                    ['asielzoekerscentrum', 'asielopvang', 'opvanglocatie', 'asielzoekers'],
+    'asielzoekerscentrum':    ['azc', 'asielopvang', 'opvanglocatie', 'asielzoekers'],
+    'asielopvang':            ['azc', 'asielzoekerscentrum', 'noodopvang', 'opvanglocatie'],
+    'asielzoekers':           ['azc', 'asielzoekerscentrum', 'vluchtelingen', 'asielopvang'],
+    'vluchtelingen':          ['asielzoekers', 'statushouders', 'vergunninghouders', 'opvang'],
+    'statushouders':          ['vergunninghouders', 'vluchtelingen', 'asielzoekers'],
+    'vergunninghouders':      ['statushouders', 'vluchtelingen'],
+    'noodopvang':             ['opvang', 'azc', 'crisisopvang', 'noodlocatie'],
+    'opvanglocatie':          ['azc', 'asielopvang', 'noodopvang'],
+    'immigratie':             ['migratie', 'asielzoekers', 'vluchtelingen'],
+    'migratie':               ['immigratie', 'asielzoekers'],
+
+    # Wonen / ruimtelijk
+    'woningbouw':             ['woningen', 'nieuwbouw', 'bouwplan', 'woningplan'],
+    'nieuwbouw':              ['woningbouw', 'bouwplan', 'woningen', 'woonwijk'],
+    'bestemmingsplan':        ['omgevingsplan', 'bouwbestemming', 'ruimtelijke ordening'],
+    'omgevingsplan':          ['bestemmingsplan', 'omgevingsvisie', 'ruimtelijk plan'],
+    'omgevingsvisie':         ['omgevingsplan', 'structuurvisie', 'ruimtelijke visie'],
+    'woonvisie':              ['woningbouwprogramma', 'woonbeleid', 'woningbouw'],
+    'corporatie':             ['woningcorporatie', 'sociale huur', 'huurwoningen'],
+    'woningcorporatie':       ['corporatie', 'sociale huur', 'huurwoningen'],
+    'sociale huur':           ['huurwoningen', 'corporatie', 'woningcorporatie'],
+
+    # Energie / klimaat
+    'windmolens':             ['windturbines', 'windpark', 'windenergie'],
+    'windturbines':           ['windmolens', 'windpark', 'windenergie'],
+    'windpark':               ['windmolens', 'windturbines', 'windenergie'],
+    'zonnepanelen':           ['zonnepark', 'zonne-energie', 'pvinstallatie'],
+    'zonnepark':              ['zonnepanelen', 'zonne-energie', 'solarveld'],
+    'aardgasvrij':            ['gasloos', 'warmtenet', 'energietransitie', 'warmtepomp'],
+    'energietransitie':       ['aardgasvrij', 'duurzaamheid', 'klimaatakkoord', 'verduurzaming'],
+    'duurzaamheid':           ['energietransitie', 'klimaat', 'verduurzaming'],
+    'warmtenet':              ['warmtepomp', 'aardgasvrij', 'stadsverwarming'],
+    'warmtepomp':             ['warmtenet', 'aardgasvrij'],
+    'klimaatakkoord':         ['energietransitie', 'duurzaamheid', 'klimaat'],
+
+    # Veiligheid / criminaliteit
+    'ondermijning':           ['georganiseerde criminaliteit', 'drugscriminaliteit', 'ondermijnende criminaliteit'],
+    'drugscriminaliteit':     ['ondermijning', 'drugs', 'drugshandel'],
+    'handhaving':             ['toezicht', 'boa', 'politie', 'controleren'],
+    'overlast':               ['hinder', 'buurtoverlast', 'leefbaarheid'],
+
+    # Financiën / beleid
+    'bezuinigingen':          ['bezuiniging', 'kostenbesparing', 'taakstelling', 'ombuigingen'],
+    'begroting':              ['financiën', 'budget', 'jaarrekening', 'gemeentebegroting'],
+    'jaarrekening':           ['begroting', 'financieel jaarverslag', 'resultaat'],
+    'ozb':                    ['onroerendezaakbelasting', 'gemeentebelasting', 'belasting'],
+    'onroerendezaakbelasting': ['ozb', 'gemeentebelasting'],
+    'subsidie':               ['subsidies', 'financiering', 'bijdrage', 'cofinanciering'],
+
+    # Zorg / sociaal domein
+    'jeugdzorg':              ['jeugdhulp', 'cjg', 'jeugdhulpverlening', 'jeugd'],
+    'jeugdhulp':              ['jeugdzorg', 'cjg', 'jeugd'],
+    'wmo':                    ['thuiszorg', 'hulp thuis', 'ondersteuning', 'maatschappelijke ondersteuning'],
+    'thuiszorg':              ['wmo', 'hulp thuis', 'mantelzorg'],
+    'bijstand':               ['uitkering', 'participatiewet', 'sociale dienst', 'levensonderhoud'],
+    'participatiewet':        ['bijstand', 'uitkering', 're-integratie'],
+    'armoede':                ['schulden', 'financiële problemen', 'bestaanszekerheid', 'minima'],
+    'schulden':               ['armoede', 'schuldhulpverlening', 'schuldensanering'],
+
+    # Openbare ruimte / infra
+    'parkeren':               ['parkeerbeleid', 'parkeernorm', 'parkeerplaatsen', 'parkeergarage'],
+    'fietspad':               ['fietspaden', 'fietsinfrastructuur', 'fietsroute', 'fietsstrook'],
+    'riolering':              ['riool', 'wateroverlast', 'afvalwater', 'rioleringsstelsel'],
+    'wegenonderhoud':         ['wegbeheer', 'asfalt', 'bestrating', 'wegen'],
+    'verkeer':                ['verkeersveiligheid', 'mobiliteit', 'verkeersoverlast'],
+    'mobiliteit':             ['verkeer', 'openbaar vervoer', 'bereikbaarheid'],
+
+    # Onderwijs / sport / cultuur
+    'schoolgebouw':           ['school', 'onderwijshuisvesting', 'scholen', 'brede school'],
+    'sportaccommodatie':      ['sporthal', 'zwembad', 'sportveld', 'sportfaciliteit'],
+    'zwembad':                ['sportaccommodatie', 'recreatievoorziening'],
+
+    # Bestuurlijk
+    'coalitieakkoord':        ['collegeprogramma', 'bestuursakkoord', 'coalitieprogram'],
+    'motie':                  ['amendement', 'motie van treurnis', 'motie van wantrouwen'],
+    'amendement':             ['motie', 'wijzigingsvoorstel'],
+    'raadsvoorstel':          ['voorstel', 'besluitvorming', 'agendapunt'],
+    'interpellatie':          ['spoeddebat', 'vragenuur', 'mondelinge vraag'],
+    'omgevingswet':           ['omgevingsplan', 'ruimtelijke ordening', 'vergunning', 'omgevingsvisie'],
+    'vergunning':             ['omgevingsvergunning', 'bouwvergunning', 'ontheffing'],
+
+    # Economie / arbeidsmarkt
+    'arbeidsmarkt':           ['werkgelegenheid', 'banen', 'werkeloosheid', 'vacatures'],
+    'werkgelegenheid':        ['arbeidsmarkt', 'banen', 'economie'],
+    'bedrijventerrein':       ['industrieterrein', 'bedrijfslocatie', 'vestigingsklimaat'],
+    'toerisme':               ['recreatie', 'toeristen', 'bezoekersaantallen'],
+}
+
+
+def _hub_expand_keywords(keywords: list) -> tuple:
+    """Geef (primary_kws, synonym_kws) terug.
+    primary_kws = originele trefwoorden (hoge score bij match).
+    synonym_kws = uitgebreide synoniemen (lagere score bij match).
+    """
+    synonym_set = []
+    for kw in keywords:
+        for syn in _HUB_SYNONYMS.get(kw, []):
+            # Splits samengestelde synoniemen op spaties (bijv. "hulp thuis" → twee termen)
+            for part in syn.split():
+                if len(part) >= 3 and part not in keywords and part not in synonym_set:
+                    synonym_set.append(part)
+    return keywords, synonym_set
+
+
 def _hub_parse_filters(query: str) -> dict:
     """Extraheer locatie, partij, datum en topic-filters uit vrije tekst.
-    Volgorde: eerst locatie (provincie > gemeente), dan partij, dan datum.
+    Volgorde: eerst locatie (provincie/regio > gemeente), dan partij, dan datum.
     """
     import re
     from datetime import date, timedelta
@@ -3418,13 +3712,35 @@ def _hub_parse_filters(query: str) -> dict:
             break
 
     # ── 2. Provincie detectie → gemeente_list ───────────────────────────────
-    for prov_name, gem_list in config.PROVINCIE_GEMEENTEN.items():
-        if prov_name.lower() in q_low:
-            filters['gemeente_list'] = gem_list
-            filters['province'] = prov_name
+    # Eerst: aliassen (kortere namen zoals "brabant", "holland")
+    detected_location_words = set()
+    for alias, canonical in _PROV_ALIASES.items():
+        if alias in q_low and canonical in config.PROVINCIE_GEMEENTEN:
+            filters['gemeente_list'] = config.PROVINCIE_GEMEENTEN[canonical]
+            filters['province'] = canonical
+            detected_location_words.update(alias.split())
             break
 
-    # ── 3. Gemeente detectie (alleen als geen provincie) ────────────────────
+    # Dan: exacte provincie-naam
+    if 'gemeente_list' not in filters:
+        for prov_name, gem_list in config.PROVINCIE_GEMEENTEN.items():
+            if prov_name.lower() in q_low:
+                filters['gemeente_list'] = gem_list
+                filters['province'] = prov_name
+                detected_location_words.update(prov_name.lower().split('-'))
+                detected_location_words.update(prov_name.lower().split())
+                break
+
+    # Dan: regio-namen (Twente, Achterhoek, etc.)
+    if 'gemeente_list' not in filters:
+        for regio, gem_list in _REGIO_GEMEENTEN.items():
+            if regio in q_low:
+                filters['gemeente_list'] = gem_list
+                filters['province'] = regio.title()
+                detected_location_words.update(regio.split())
+                break
+
+    # ── 3. Gemeente detectie (alleen als geen provincie/regio) ────────────────
     if 'gemeente_list' not in filters:
         # Haal alle bekende gemeente-namen op uit DB
         try:
@@ -3435,9 +3751,14 @@ def _hub_parse_filters(query: str) -> dict:
             for (gname,) in _gem_rows:
                 if gname and gname.lower() in q_low:
                     filters['gemeente'] = gname
+                    detected_location_words.update(gname.lower().split())
                     break
         except Exception:
             pass
+
+    # Sla gedetecteerde locatiewoorden op zodat hub_search ze kan uitsluiten van keywords
+    if detected_location_words:
+        filters['location_words'] = detected_location_words
 
     # ── 4. Partij detectie ──────────────────────────────────────────────────
     detected_parties = []
@@ -3467,38 +3788,59 @@ def _hub_retrieve(query: str, gemeente: str = None, date_from: str = None,
                   date_to: str = None, top_k: int = 12,
                   gemeente_list: list = None, parties: list = None) -> list:
     """Haal relevante chunks op uit transcripten en documenten.
-    Filtert eerst op locatie (gemeente of gemeente_list), dan op keywords.
-    Party-namen boosteren sprekers die voor die partij spreken.
+    Filtert eerst op locatie (gemeente of gemeente_list), dan op keywords + synoniemen.
+    Exacte keyword-matches scoren zwaarder dan synoniematches.
     """
     import sqlite3, re
 
     keywords = [
         w for w in re.split(r'\W+', query.lower())
-        if len(w) >= 4 and w not in _HUB_STOPWORDS
+        if len(w) >= 3 and w not in _HUB_STOPWORDS
     ]
-    # Voeg partijnamen toe als zoekterm (als aliases)
+    # Synoniemuitbreiding
+    primary_kws, synonym_kws = _hub_expand_keywords(keywords)
+
+    # Partijnamen als zoekterm
     party_terms = []
     if parties:
         for p in parties:
             party_terms.append(p.lower())
-            # Voeg ook alias toe
             for alias, canonical in _HUB_PARTIES:
                 if canonical == p:
                     party_terms.append(alias)
 
-    all_terms = keywords + [pt for pt in party_terms if pt not in keywords]
-    if not all_terms:
+    # SQL-termen: primaire + synoniemen + partij (alles voor WHERE-clausule)
+    all_search_terms = primary_kws + [s for s in synonym_kws if s not in primary_kws]
+    all_search_terms += [pt for pt in party_terms if pt not in all_search_terms]
+    if not all_search_terms:
         return []
 
     results = []
+
+    def _loc_filter(q_str: str, p_list: list):
+        """Voeg locatiefilter toe aan SQL-query en params."""
+        if gemeente:
+            q_str += ' AND LOWER(g.naam) = ?'
+            p_list.append(gemeente.lower())
+        elif gemeente_list:
+            placeholders = ','.join('?' * len(gemeente_list))
+            q_str += f' AND g.naam IN ({placeholders})'
+            p_list.extend(gemeente_list)
+        if date_from:
+            q_str += ' AND m.datum >= ?'
+            p_list.append(date_from)
+        if date_to:
+            q_str += ' AND m.datum <= ?'
+            p_list.append(date_to)
+        return q_str, p_list
 
     try:
         conn_r = sqlite3.connect(config.RANST_DB)
         conn_r.execute(f"ATTACH DATABASE '{config.MEETINGS_DB}' AS mdb")
 
         # ── Transcripten ──────────────────────────────────────────────────
-        kw_clauses = ' OR '.join([f"LOWER(tc.text) LIKE ?" for _ in all_terms])
-        kw_params = [f'%{w}%' for w in all_terms]
+        kw_clauses = ' OR '.join([f"LOWER(tc.text) LIKE ?" for _ in all_search_terms])
+        params = [f'%{w}%' for w in all_search_terms]
 
         q_tr = f"""
             SELECT tc.id, tc.meeting_id, tc.start_time, tc.end_time,
@@ -3508,39 +3850,24 @@ def _hub_retrieve(query: str, gemeente: str = None, date_from: str = None,
             JOIN mdb.gemeenten g ON g.id = m.gemeente_id
             WHERE ({kw_clauses})
         """
-        params = kw_params[:]
-
-        if gemeente:
-            q_tr += ' AND LOWER(g.naam) = ?'
-            params.append(gemeente.lower())
-        elif gemeente_list:
-            placeholders = ','.join('?' * len(gemeente_list))
-            q_tr += f' AND g.naam IN ({placeholders})'
-            params.extend(gemeente_list)
-
-        if date_from:
-            q_tr += ' AND m.datum >= ?'
-            params.append(date_from)
-        if date_to:
-            q_tr += ' AND m.datum <= ?'
-            params.append(date_to)
-
+        q_tr, params = _loc_filter(q_tr, params)
         q_tr += ' ORDER BY m.datum DESC LIMIT ?'
-        params.append(top_k * 3)
+        params.append(top_k * 4)
 
         for row in conn_r.execute(q_tr, params).fetchall():
             text_low = (row[5] or '').lower()
             speaker_low = (row[4] or '').lower()
 
-            # Basis keyword-score
-            score = sum(1 for w in keywords if w in text_low)
-
-            # Party boost: spreekt voor partij of noemt partij
+            # Primaire keywords: score 2 per treffer
+            score = sum(2 for w in primary_kws if w in text_low)
+            # Synoniemen: score 1 per treffer
+            score += sum(1 for w in synonym_kws if w in text_low)
+            # Party boost
             for pt in party_terms:
                 if pt in speaker_low:
-                    score += 4  # Spreekt namens partij
+                    score += 4
                 if pt in text_low:
-                    score += 1  # Partij wordt genoemd
+                    score += 1
 
             if score == 0:
                 continue
@@ -3569,11 +3896,11 @@ def _hub_retrieve(query: str, gemeente: str = None, date_from: str = None,
         # ── Documenten ────────────────────────────────────────────────────
         doc_clauses = ' OR '.join([
             f"(LOWER(d.title) LIKE ? OR LOWER(d.extracted_text) LIKE ?)"
-            for _ in all_terms
+            for _ in all_search_terms
         ])
-        doc_params = []
-        for w in all_terms:
-            doc_params += [f'%{w}%', f'%{w}%']
+        dparams = []
+        for w in all_search_terms:
+            dparams += [f'%{w}%', f'%{w}%']
 
         q_doc = f"""
             SELECT d.id, d.meeting_id, d.title, d.download_url, d.extracted_text,
@@ -3584,32 +3911,22 @@ def _hub_retrieve(query: str, gemeente: str = None, date_from: str = None,
             WHERE d.extracted_text IS NOT NULL AND d.extracted_text != ''
               AND ({doc_clauses})
         """
-        dparams = doc_params[:]
-
-        if gemeente:
-            q_doc += ' AND LOWER(g.naam) = ?'
-            dparams.append(gemeente.lower())
-        elif gemeente_list:
-            placeholders = ','.join('?' * len(gemeente_list))
-            q_doc += f' AND g.naam IN ({placeholders})'
-            dparams.extend(gemeente_list)
-
-        if date_from:
-            q_doc += ' AND m.datum >= ?'
-            dparams.append(date_from)
-        if date_to:
-            q_doc += ' AND m.datum <= ?'
-            dparams.append(date_to)
-
+        q_doc, dparams = _loc_filter(q_doc, dparams)
         q_doc += ' ORDER BY m.datum DESC LIMIT ?'
-        dparams.append(top_k * 3)
+        dparams.append(top_k * 4)
 
         for row in conn_m.execute(q_doc, dparams).fetchall():
             text = row[4] or ''
             text_low = text.lower()
             title_low = (row[2] or '').lower()
-            score = sum(1 for w in keywords if w in text_low or w in title_low)
-            # Boost moties/besluiten met partijnaam
+
+            # Primaire keywords in tekst én titel
+            score  = sum(2 for w in primary_kws if w in text_low)
+            score += sum(3 for w in primary_kws if w in title_low)   # titelmatch zwaarder
+            # Synoniemen
+            score += sum(1 for w in synonym_kws if w in text_low)
+            score += sum(2 for w in synonym_kws if w in title_low)
+            # Party boost
             for pt in party_terms:
                 if pt in title_low:
                     score += 3
@@ -3725,10 +4042,15 @@ async def hub_search(body: dict):
         query_type = 'gemeente_research'
 
     # Keywords voor retrieval en snippet-extractie
-    kws = [
+    # Locatiewoorden (provincie, gemeente) uitsluiten — die filteren via SQL, niet via keyword-match
+    _loc_words = parsed.get('location_words', set())
+    _base_kws = [
         w for w in _re.split(r'\W+', query.lower())
-        if len(w) >= 4 and w not in _HUB_STOPWORDS
+        if len(w) >= 3 and w not in _HUB_STOPWORDS and w not in _loc_words
     ]
+    _primary_kws, _synonym_kws = _hub_expand_keywords(_base_kws)
+    # kws = primaire + synoniemen, gebruikt voor snippet-highlighting en context
+    kws = _primary_kws + [s for s in _synonym_kws if s not in _primary_kws]
 
     def _call_llm(prompt: str, max_tokens: int = 600) -> str:
         """Roep het LLM aan. Altijd — ook bij fout geeft fallback tekst."""

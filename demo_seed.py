@@ -67,7 +67,34 @@ DEMO_ARTIKELEN = [
         'minutes_ago': 72,
     },
 
-    # ── Bestuur & Politiek — Pers ─────────────────────────────────────────
+    # ── Bestuur & Politiek — Wierden — Bestuurlijk ───────────────────────
+    {
+        'gemeente': 'Wierden',
+        'topic': 'bestuur_politiek',
+        'level': 'bestuurlijk',
+        'title': 'Wierden: Gevolgen referendumuitslag voor provinciaal herindelingsproces',
+        'body': (
+            "**Samenvatting**\n"
+            "De raad van Wierden besprak de consequenties van het referendumresultaat (58,3% tegen herindeling "
+            "met Almelo) voor het lopende provinciale traject. De provincie Overijssel had de herindeling in haar "
+            "coalitieakkoord staan; de uitslag stelt dat voornemen fundamenteel ter discussie.\n\n"
+            "**Standpunten**\n"
+            "Burgemeester Wolters: 'De uitslag bindt de gemeente niet juridisch, maar is politiek zwaarwegend.' "
+            "Fractievoorzitter Kroon (Lokaal Wierden): 'We verwachten dat de provincie het herindelingsvoorstel "
+            "intrekt.' Fractievoorzitter Jacobs (CDA): 'We moeten ook kijken naar samenwerking zonder fusie — "
+            "ambtelijke integratie is bespreekbaar.'\n\n"
+            "**Actiepunten**\n"
+            "1. College stuurt formele brief aan GS Overijssel met uitslag en verzoek tot herbezinning\n"
+            "2. Raad stelt bijzondere commissie in voor alternatieve samenwerkingsvormen (voor 1 mei)\n"
+            "3. Griffier inventariseert juridische status referendumuitslag bij VNG\n"
+            "4. College informeert gemeenschap via bewonersbrief binnen twee weken"
+        ),
+        'score': 0.84,
+        'indicators': ['herindeling', 'referendum', 'provinciale samenwerking', 'raadsbesluit'],
+        'minutes_ago': 105,
+    },
+
+    # ── Bestuur & Politiek — Wierden — Pers ──────────────────────────────
     {
         'gemeente': 'Wierden',
         'topic': 'bestuur_politiek',
@@ -85,7 +112,25 @@ DEMO_ARTIKELEN = [
         'minutes_ago': 110,
     },
 
-    # ── Financiën & Toezicht — Bestuurlijk ───────────────────────────────
+    # ── Financiën & Toezicht — Krimpen aan den IJssel — Pers ─────────────
+    {
+        'gemeente': 'Krimpen aan den IJssel',
+        'topic': 'financien_toezicht',
+        'level': 'pers',
+        'title': 'Krimpen aan den IJssel: nieuwe coalitie erft begrotingstekort van 2,1 miljoen',
+        'body': (
+            "KRIMPEN AAN DEN IJSSEL — De nieuwe gemeenteraad van Krimpen aan den IJssel staat direct voor "
+            "een financiële opgave. Scheidend wethouder financiën De Groot (CDA) maakte bekend dat het "
+            "begrotingstekort voor 2026 is opgelopen tot 2,1 miljoen euro, 400.000 euro meer dan eerder "
+            "geraamd. Hogere jeugdzorgkosten en tegenvallende rijksuitkeringen zijn de oorzaak. De provincie "
+            "Zuid-Holland kan preventief toezicht instellen als er geen sluitend plan komt."
+        ),
+        'score': 0.83,
+        'indicators': ['begrotingstekort', 'financiën', 'preventief toezicht'],
+        'minutes_ago': 60,
+    },
+
+    # ── Financiën & Toezicht — Krimpen aan den IJssel — Bestuurlijk ──────
     {
         'gemeente': 'Krimpen aan den IJssel',
         'topic': 'financien_toezicht',
@@ -113,7 +158,36 @@ DEMO_ARTIKELEN = [
         'minutes_ago': 55,
     },
 
-    # ── Wonen & Ruimte — Pers ─────────────────────────────────────────────
+    # ── Wonen & Ruimte — Tilburg — Bestuurlijk ───────────────────────────
+    {
+        'gemeente': 'Tilburg',
+        'topic': 'wonen_ruimte',
+        'level': 'bestuurlijk',
+        'title': 'Tilburg: woningbouwprogramma 2026–2030 — continuïteit bij coalitiewisseling',
+        'body': (
+            "**Samenvatting**\n"
+            "Scheidend wethouder Janssen (PvdA) lichtte toe dat de 8.500 woningen in de bouwpijplijn "
+            "juridisch zijn verankerd via het omgevingsplan en niet eenzijdig kunnen worden teruggedraaid. "
+            "De coalitiewisseling na de verkiezingen heeft uitsluitend gevolgen voor het tempo en de "
+            "programmering, niet voor de totaalomvang. Tilburg Centraal (winnende partij) wil het sociale "
+            "huuraandeel verhogen van 30 naar 40 procent; dit vereist een actualisatie van het omgevingsplan.\n\n"
+            "**Standpunten**\n"
+            "Wethouder Janssen (PvdA): 'De woningbouwlocaties zijn vaststelling — de nieuwe wethouder "
+            "kan niet opnieuw beginnen.' Fractievoorzitter Kessels (Tilburg Centraal): 'Wij willen méér "
+            "betaalbare huur, niet minder bouwen.' Fractievoorzitter Hendrickx (VVD): 'Verhoging sociale "
+            "huur maakt projecten financieel moeilijker — dit vraagt markttoets.'\n\n"
+            "**Actiepunten**\n"
+            "1. Nieuwe wethouder wonen neemt portfolio over inclusief alle lopende anterieure overeenkomsten\n"
+            "2. Coalitieakkoord bepaalt of sociale huurquota omhoog gaat — effect op 12 nieuwbouwlocaties\n"
+            "3. Evaluatie voortgang bouwprogramma Q2 2026 (gepland)\n"
+            "4. Ambtelijk dossier overdrachtsmemo gereed voor 1 april"
+        ),
+        'score': 0.77,
+        'indicators': ['woningbouw', 'omgevingsplan', 'sociale huur', 'bouwopgave'],
+        'minutes_ago': 32,
+    },
+
+    # ── Wonen & Ruimte — Tilburg — Pers ──────────────────────────────────
     {
         'gemeente': 'Tilburg',
         'topic': 'wonen_ruimte',
@@ -132,7 +206,26 @@ DEMO_ARTIKELEN = [
         'minutes_ago': 38,
     },
 
-    # ── Bereikbaarheid & Infra — Bestuurlijk ──────────────────────────────
+    # ── Bereikbaarheid & Infra — Schagen — Pers ──────────────────────────
+    {
+        'gemeente': 'Schagen',
+        'topic': 'bereikbaarheid_infra',
+        'level': 'pers',
+        'title': 'Schagen: reconstructie N245 opnieuw uitgesteld, nieuwe raad moet beslissen',
+        'body': (
+            "SCHAGEN — De geplande reconstructie van de N245 tussen Schagen en Sint Maarten gaat er "
+            "voorlopig niet komen. De scheidende gemeenteraad besloot het benodigde krediet van 14 "
+            "miljoen euro niet vrij te geven. Bezwaren van omwonenden en onduidelijkheid over de "
+            "provinciale bijdrage van 6 miljoen euro lagen hieraan ten grondslag. De nieuwe raad "
+            "moet na de installatie opnieuw een besluit nemen. Critici noemen het uitstel 'onverantwoord' "
+            "vanwege de verkeersveiligheid op de N245."
+        ),
+        'score': 0.74,
+        'indicators': ['provinciale weg', 'bereikbaarheid', 'verkeersveiligheid'],
+        'minutes_ago': 22,
+    },
+
+    # ── Bereikbaarheid & Infra — Schagen — Bestuurlijk ───────────────────
     {
         'gemeente': 'Schagen',
         'topic': 'bereikbaarheid_infra',
@@ -161,7 +254,36 @@ DEMO_ARTIKELEN = [
         'minutes_ago': 25,
     },
 
-    # ── Veiligheid — Pers ─────────────────────────────────────────────────
+    # ── Veiligheid — Middelburg — Bestuurlijk ────────────────────────────
+    {
+        'gemeente': 'Middelburg',
+        'topic': 'veiligheid',
+        'level': 'bestuurlijk',
+        'title': 'Middelburg: Veiligheidsregio Zeeland — financieringsplan versterking vrijwillige brandweer',
+        'body': (
+            "**Samenvatting**\n"
+            "Directeur Pieterse van de Veiligheidsregio Zeeland presenteerde een plan voor structurele "
+            "versterking van de vrijwillige brandweer. De extra investering van 1,2 miljoen euro wordt "
+            "verdeeld over de 13 deelnemende gemeenten op basis van inwoneraantal. Middelburg draagt "
+            "circa 95.000 euro bij. De middelen zijn bestemd voor oefentijdvergoeding, persoonlijke "
+            "uitrusting en een regionale wervingscampagne.\n\n"
+            "**Standpunten**\n"
+            "Directeur Pieterse: 'Zonder actie verliezen we de komende twee jaar 80 vrijwilligers door "
+            "uitstroom.' Burgemeester Doorn (Middelburg): 'De investering is noodzakelijk — onderbezetting "
+            "is een reëel veiligheidsrisico.' Fractievoorzitter Bakker (PvdA/GL): 'Wij steunen dit, maar "
+            "willen ook kijken naar structurele financiering via het rijk.'\n\n"
+            "**Actiepunten**\n"
+            "1. Gemeenteraad Middelburg neemt voor 1 mei besluit over bijdrage van €95.000\n"
+            "2. Veiligheidsregio start wervingscampagne Q2 2026 na toezegging alle gemeenten\n"
+            "3. Ambtelijk voorstel voor bijdrageregeling naar commissie Bestuur uiterlijk 15 april\n"
+            "4. Evaluatiemoment gepland voor eind 2026 op basis van bezettingscijfers"
+        ),
+        'score': 0.73,
+        'indicators': ['veiligheidsregio', 'brandweer', 'vrijwilligers', 'raadsbesluit'],
+        'minutes_ago': 15,
+    },
+
+    # ── Veiligheid — Middelburg — Pers ────────────────────────────────────
     {
         'gemeente': 'Middelburg',
         'topic': 'veiligheid',
@@ -180,7 +302,35 @@ DEMO_ARTIKELEN = [
         'minutes_ago': 18,
     },
 
-    # ── Bestuur & Politiek — Pers (recenter) ─────────────────────────────
+    # ── Bestuur & Politiek — Smallingerland — Bestuurlijk ────────────────
+    {
+        'gemeente': 'Smallingerland',
+        'topic': 'bestuur_politiek',
+        'level': 'bestuurlijk',
+        'title': 'Smallingerland: FNP-formatieverzoek en coalitieoriëntatie na verkiezingen',
+        'body': (
+            "**Samenvatting**\n"
+            "De FNP werd de grootste partij in Smallingerland met vijf van de 23 zetels. Lijsttrekker "
+            "Visser ontving vrijdag een formatieverzoek van de burgemeester. De FNP heeft verklaard "
+            "open te staan voor een brede coalitie en sluit geen partijen bij voorbaat uit. PvdA en "
+            "CDA reageerden positief; VVD wil eerst inhoudelijke gesprekken.\n\n"
+            "**Standpunten**\n"
+            "FNP-lijsttrekker Visser: 'We willen een stabiel college met draagvlak voor de Friese agenda.' "
+            "PvdA-fractievoorzitter Dijkstra: 'Onze prioriteit is betaalbare woningbouw — daar liggen "
+            "raakvlakken met de FNP.' VVD-fractievoorzitter Hoekstra: 'We hechten aan financiële "
+            "discipline — dat moet het vertrekpunt zijn in coalitiegesprekken.'\n\n"
+            "**Actiepunten**\n"
+            "1. FNP start informatiegesprekken met alle fracties voor 28 maart\n"
+            "2. Burgemeester benoemt formateur zodra informatieverslag beschikbaar is\n"
+            "3. Griffier stelt programma voor installatievergadering op (streefdatum 3 april 2026)\n"
+            "4. Ambtelijke overdracht lopende dossiers aan nieuwe fractie-coördinatoren"
+        ),
+        'score': 0.79,
+        'indicators': ['coalitie', 'formatie', 'raadsvergadering', 'Fries'],
+        'minutes_ago': 12,
+    },
+
+    # ── Bestuur & Politiek — Smallingerland — Pers ───────────────────────
     {
         'gemeente': 'Smallingerland',
         'topic': 'bestuur_politiek',
@@ -198,7 +348,25 @@ DEMO_ARTIKELEN = [
         'minutes_ago': 8,
     },
 
-    # ── Bestuur & Politiek — Oldenzaal ───────────────────────────────────
+    # ── Bestuur & Politiek — Oldenzaal — Pers ────────────────────────────
+    {
+        'gemeente': 'Oldenzaal',
+        'topic': 'bestuur_politiek',
+        'level': 'pers',
+        'title': 'Oldenzaal: Solidariteit Oldenzaal geeft informateur opdracht na verkiezingswinst',
+        'body': (
+            "OLDENZAAL — Solidariteit Oldenzaal (SO) heeft vrijdag een informateur aangesteld na de "
+            "gemeenteraadsverkiezingen van 19 maart 2026. De partij groeide naar de grootste fractie "
+            "en presenteerde via lijsttrekker R. Bouwman de formatieopdracht aan alle zeven fracties. "
+            "VVD-lijsttrekker Mekelenkamp reageerde positief maar vroeg om openbare verslaglegging. "
+            "De informateur start komende week met gesprekken. Een zakencollege behoort tot de opties."
+        ),
+        'score': 0.89,
+        'indicators': ['formatie', 'coalitie', 'raadsvergadering', 'informateur'],
+        'minutes_ago': 75,
+    },
+
+    # ── Bestuur & Politiek — Oldenzaal — Bestuurlijk ─────────────────────
     {
         'gemeente': 'Oldenzaal',
         'topic': 'bestuur_politiek',
@@ -277,7 +445,26 @@ DEMO_ARTIKELEN = [
         'minutes_ago': 30,
     },
 
-    # ── Economie & Innovatie — Bestuurlijk ───────────────────────────────
+    # ── Economie & Innovatie — Venray — Pers ─────────────────────────────
+    {
+        'gemeente': 'Venray',
+        'topic': 'economie_innovatie',
+        'level': 'pers',
+        'title': 'Venray: scheidende raad stelt omstreden bedrijventerrein Smakterheide II toch vast',
+        'body': (
+            "VENRAY — Ondanks bezwaren van drie partijen heeft de scheidende gemeenteraad van Venray "
+            "het bestemmingsplan voor bedrijventerrein Smakterheide II vastgesteld. Het terrein van "
+            "22 hectare is bestemd voor logistieke en industriële bedrijven. De beslissing passeerde "
+            "met een krappe meerderheid. SP-fractievoorzitter Lommen sprak van 'electoraal opportunisme'. "
+            "De Ondernemersvereniging Venray reageerde opgelucht: 'Na twee jaar onzekerheid is er "
+            "eindelijk duidelijkheid.' Omwonenden hebben zes weken de tijd voor bezwaar."
+        ),
+        'score': 0.71,
+        'indicators': ['bedrijventerrein', 'bestemmingsplan', 'werkgelegenheid'],
+        'minutes_ago': 8,
+    },
+
+    # ── Economie & Innovatie — Venray — Bestuurlijk ───────────────────────
     {
         'gemeente': 'Venray',
         'topic': 'economie_innovatie',

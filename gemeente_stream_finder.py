@@ -30,7 +30,7 @@ GEMEENTEN = [
     # Flevoland
     "Almere", "Dronten", "Lelystad", "Noordoostpolder", "Urk", "Zeewolde",
     # Friesland
-    "Achtkarspelen", "Ameland", "Dantumadeel", "De Fryske Marren",
+    "Achtkarspelen", "Ameland", "Dantumadiel", "De Fryske Marren",
     "Harlingen", "Heerenveen", "Leeuwarden", "Noardeast-Fryslân",
     "Ooststellingwerf", "Opsterland", "Schiermonnikoog",
     "Smallingerland", "Súdwest-Fryslân", "Terschelling", "Vlieland",
@@ -62,7 +62,7 @@ GEMEENTEN = [
     # Noord-Brabant
     "Altena", "Asten", "Baarle-Nassau", "Bergen op Zoom", "Bernheze",
     "Best", "Bladel", "Boekel", "Boxtel", "Breda",
-    "Cranendonck", "Cuijk", "Deurne", "Dongen", "Drimmelen",
+    "Cranendonck", "Deurne", "Dongen", "Drimmelen",
     "Eersel", "Eindhoven", "Etten-Leur", "Geertruidenberg", "Geldrop-Mierlo",
     "Gemert-Bakel", "Gilze en Rijen", "Goirle", "Grave", "Halderberge",
     "Heeze-Leende", "Helmond", "Heusden", "Hilvarenbeek",
@@ -103,9 +103,9 @@ GEMEENTEN = [
     "Terneuzen", "Tholen", "Veere", "Vlissingen",
     # Zuid-Holland
     "Alblasserdam", "Alphen aan den Rijn", "Barendrecht", "Bodegraven-Reeuwijk",
-    "Brielle", "Capelle aan den IJssel", "Delft", "Dordrecht",
+    "Capelle aan den IJssel", "Delft", "Dordrecht",
     "Goeree-Overflakkee", "Gorinchem", "Gouda", "Hardinxveld-Giessendam",
-    "Hellevoetsluis", "Hendrik-Ido-Ambacht", "Hillegom",
+    "Hendrik-Ido-Ambacht", "Hillegom",
     "Hoeksche Waard", "Kaag en Braassem", "Katwijk", "Krimpen aan den IJssel",
     "Krimpenerwaard", "Lansingerland", "Leiden", "Leiderdorp",
     "Leidschendam-Voorburg", "Lisse", "Maassluis", "Midden-Delfland",
@@ -113,8 +113,8 @@ GEMEENTEN = [
     "Papendrecht", "Pijnacker-Nootdorp", "Ridderkerk", "Rijswijk",
     "Rotterdam", "Schiedam", "Sliedrecht", "Súdwest-Fryslân",
     "Teylingen", "Voorschoten", "Waddinxveen", "Wassenaar",
-    "Westland", "Westvoorne", "Zoetermeer", "Zoeterwoude",
-    "Zuidplas", "'s-Gravenhage",
+    "Voorne aan Zee", "Westland", "Zoetermeer", "Zoeterwoude",
+    "Zuidplas",
     # Caribisch Nederland
     "Bonaire", "Sint Eustatius", "Saba",
 ]
@@ -252,9 +252,18 @@ def _load_notubiz_orgs():
         orgs = data.get('organisations', {}).get('organisation', [])
 
         # Bouw lookup: genormaliseerde naam → org info
+        # Filter niet-gemeente organisaties (provincies, waterschappen, etc.)
+        _SKIP_PREFIXES = (
+            'provincie ', 'waterschap ', 'hoogheemraadschap ',
+            'veiligheidsregio ', 'omgevingsdienst ', 'ggd ',
+            'overleg ', 'regio ', 'samenwerkingsverband ',
+        )
         lookup = {}
         for org in orgs:
             raw_name = org.get('name', '').strip()
+            # Skip niet-gemeente organisaties
+            if raw_name.lower().startswith(_SKIP_PREFIXES):
+                continue
             # Normaliseer: verwijder "Gemeente " prefix, lowercase, strip
             clean = raw_name.lower()
             for prefix in ['gemeente ', 'deelgemeente ']:
@@ -302,6 +311,30 @@ def _get_notubiz_real_url(org_id):
                 return match.group(1)
     except Exception:
         pass
+    return None
+
+
+# ── ConnectedViews ──────────────────────────────────────────────────────────
+# Bekende ConnectedViews gemeenten: naam → (cv_slug, base_url)
+CONNECTEDVIEWS_KNOWN = {
+    'Utrecht': ('gemeente_utrecht', 'https://gemeenteutrecht.connectedviews.nl'),
+}
+
+
+def check_connectedviews(gemeente):
+    """Check ConnectedViews platform voor bekende gemeenten."""
+    if gemeente not in CONNECTEDVIEWS_KNOWN:
+        return None
+    cv_slug, base_url = CONNECTEDVIEWS_KNOWN[gemeente]
+    # Verifieer dat de pagina bereikbaar is
+    status, final_url, body = _fetch_body(f'{base_url}/HomeCityCouncil/{cv_slug}?lang=nl')
+    if status == 200 and _is_valid_body(body):
+        return {
+            'platform': 'connectedviews',
+            'url': final_url or f'{base_url}/HomeCityCouncil/{cv_slug}?lang=nl',
+            'cv_slug': cv_slug,
+            'status': 'found',
+        }
     return None
 
 
@@ -441,6 +474,7 @@ def find_streams_for_gemeente(gemeente):
     # Check alle platforms
     checks = [
         ('NotuBiz', check_notubiz),
+        ('ConnectedViews', check_connectedviews),
         ('iBabs', check_ibabs),
         ('GemeenteOplossingen', check_gemeenteoplossingen),
         ('YouTube', check_youtube),

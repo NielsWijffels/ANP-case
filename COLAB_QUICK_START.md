@@ -7,7 +7,7 @@
 2. Menu: **File → New notebook**
 
 ### Step 2: Enable GPU
-1. **Runtime** → **Change runtime type**
+1. **Runtime** → **Change runtime type**1. 
 2. Select: **GPU** (T4 recommended)
 3. Click **Save**
 
