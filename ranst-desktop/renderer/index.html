@@ -352,6 +352,14 @@ body.slim-mode .art-footer{margin-top:7px;}
 .wk-cam{font-size:10px;}
 .wk-empty{color:var(--text-3);font-size:11px;padding:6px 4px;}
 
+/* Weekkalender: kleinere tekst in dag-items */
+.cal-week-grid .cd-item{padding:5px 6px;gap:5px;border-bottom:none;border-radius:4px;margin-bottom:2px;}
+.cal-week-grid .cd-time{font-size:9px;min-width:28px;}
+.cal-week-grid .cd-gem{font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cal-week-grid .cd-ttl{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cal-week-grid .cd-live-dot{width:5px;height:5px;}
+.cal-week-grid .cd-stream-icon{font-size:9px;}
+
 .cal-grid-head{
   display:grid;grid-template-columns:repeat(7,1fr);gap:0;
   margin-bottom:4px;
@@ -2301,6 +2309,8 @@ async function renderWeekView() {
   grid.querySelectorAll('.cd-item').forEach(el => {
     el.addEventListener('click', () => openMeeting(+el.dataset.id, 'kalender'))
   })
+
+  renderUpcoming()
 }
 
 function calCell(day, ymd, otherMonth, today) {
